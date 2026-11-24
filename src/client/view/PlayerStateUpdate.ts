@@ -54,4 +54,9 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
   if (pu.alliances !== undefined) target.alliances = pu.alliances;
   if (pu.outgoingEmojis !== undefined)
     target.outgoingEmojis = pu.outgoingEmojis;
+  if (pu.civilianPopulation !== undefined)
+    target.civilianPopulation = pu.civilianPopulation;
+  if (pu.science !== undefined) target.science = pu.science;
+  if (pu.stability !== undefined) target.stability = pu.stability;
+  if (pu.taxRate !== undefined) target.taxRate = pu.taxRate;
 }

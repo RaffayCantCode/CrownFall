@@ -11,6 +11,7 @@ import {
   PlayerID,
   PlayerProfile,
   PlayerType,
+  TaxRate,
   Team,
   Tick,
   UnitType,
@@ -22,6 +23,7 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { ClientID } from "@openfront/engine-api/Schemas";
+import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { PatternDecoder } from "@openfront/shared/PatternDecoder";
 import { createRandomName } from "@openfront/shared/SharedUtil";
 import { PlayerCosmetics } from "@openfront/shared/WireSchemas";
@@ -493,6 +495,24 @@ export class PlayerView implements PlayerLike {
 
   isLobbyCreator(): boolean {
     return this.static.isLobbyCreator;
+  }
+
+  civilianPopulation(): number {
+    return (
+      this.state.civilianPopulation ?? CROWNFALL_CONFIG.startingCivilianPop
+    );
+  }
+
+  science(): number {
+    return this.state.science ?? 0;
+  }
+
+  stability(): number {
+    return this.state.stability ?? CROWNFALL_CONFIG.startingStability;
+  }
+
+  taxRate(): TaxRate {
+    return (this.state.taxRate as TaxRate | undefined) ?? TaxRate.Normal;
   }
 
   isAlliedWith(other: PlayerView): boolean {

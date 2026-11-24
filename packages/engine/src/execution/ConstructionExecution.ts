@@ -164,6 +164,11 @@ export class ConstructionExecution implements Execution {
       case UnitType.Factory:
         this.mg.addExecution(new FactoryExecution(this.structure!));
         break;
+      case UnitType.Housing:
+      case UnitType.PublicServices:
+      case UnitType.ResearchCentre:
+        // Passive civilian structures: aggregated per-second by PlayerExecution.
+        break;
       default:
         console.warn(
           `unit type ${this.constructionType} cannot be constructed`,
@@ -180,6 +185,9 @@ export class ConstructionExecution implements Execution {
       case UnitType.SAMLauncher:
       case UnitType.City:
       case UnitType.Factory:
+      case UnitType.Housing:
+      case UnitType.PublicServices:
+      case UnitType.ResearchCentre:
         return true;
       default:
         return false;

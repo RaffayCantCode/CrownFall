@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="crownGold" x1="8" y1="12" x2="56" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#926A18"/>
+    </linearGradient>
+  </defs>
+  <path d="M8 46L4 18L20 30L32 12L44 30L60 18L56 46H8Z" fill="url(#crownGold)" stroke="#FEF3C7" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="8" y="48" width="48" height="6" rx="2" fill="url(#crownGold)" stroke="#FEF3C7" stroke-width="1.5"/>
+  <circle cx="32" cy="11" r="3.5" fill="#FEF3C7"/>
+  <circle cx="4" cy="17" r="3" fill="#FDE68A"/>
+  <circle cx="60" cy="17" r="3" fill="#FDE68A"/>
+  <path d="M32 25L35 32L32 39L29 32L32 25Z" fill="#991B1B"/>
+</svg>

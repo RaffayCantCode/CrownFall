@@ -56,13 +56,18 @@ export class PlayPage extends LitElement {
             </button>
 
             <div
-              class="col-start-2 flex items-center justify-center text-malibu-blue min-w-0"
+              class="col-start-2 flex items-center justify-center gap-1.5 text-malibu-blue min-w-0"
             >
               <img
-                src=${assetUrl("images/OpenFrontLogo.svg")}
-                alt="OpenFront"
-                class="h-full w-auto"
+                src=${assetUrl("images/CrownfallCrownIcon.svg")}
+                alt="Crownfall"
+                class="h-6 w-6 object-contain"
               />
+              <span
+                class="text-base font-extrabold tracking-[0.16em] uppercase bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent"
+              >
+                CROWNFALL
+              </span>
             </div>
 
             <!-- Right slot: bell, help, settings and the profile control. The menu is
@@ -88,8 +93,39 @@ export class PlayPage extends LitElement {
             class="lg:hidden h-[calc(env(safe-area-inset-top)+56px)] -mb-4"
           ></div>
 
-          <!-- Left column: news banner + identity row, stacked tight. -->
+          <!-- Left column: Crownfall banner + news + identity row, stacked tight. -->
           <div class="flex flex-col gap-2 min-w-0">
+            <div
+              class="hidden sm:flex items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-gradient-to-r from-[#0d111a]/95 via-[#141a29]/90 to-[#0d111a]/95 px-4 py-2.5 shadow-[0_0_20px_rgba(212,175,55,0.12)]"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <img
+                  src=${assetUrl("images/CrownfallCrownIcon.svg")}
+                  alt="Crownfall"
+                  class="h-8 w-8 shrink-0 drop-shadow-[0_0_8px_rgba(212,175,55,0.45)]"
+                />
+                <div class="min-w-0">
+                  <div
+                    class="text-sm font-extrabold tracking-[0.16em] uppercase text-amber-300"
+                  >
+                    CROWNFALL
+                  </div>
+                  <div
+                    class="text-xs text-slate-300/90 truncate"
+                    data-i18n="crownfall.tagline"
+                  >
+                    Rise to power. Fight to remain.
+                  </div>
+                </div>
+              </div>
+              <span
+                class="shrink-0 rounded-full border border-amber-400/35 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300"
+                data-i18n="crownfall.edition_badge"
+              >
+                Strategic Expansion
+              </span>
+            </div>
+
             <!-- Off on compact screens (see styles.css), like Streaming Now. -->
             <news-box class="compact:hidden"></news-box>
 

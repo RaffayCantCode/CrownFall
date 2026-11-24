@@ -19,8 +19,11 @@ import {
   UT_CITY,
   UT_DEFENSE_POST,
   UT_FACTORY,
+  UT_HOUSING,
   UT_MISSILE_SILO,
   UT_PORT,
+  UT_PUBLIC_SERVICES,
+  UT_RESEARCH_CENTRE,
   UT_SAM_LAUNCHER,
 } from "../../types";
 import { DynamicInstanceBuffer } from "../DynamicBuffer";
@@ -37,6 +40,11 @@ import structureFragSrc from "../shaders/structure/structure.frag.glsl?raw";
 import structureVertSrc from "../shaders/structure/structure.vert.glsl?raw";
 
 const iconAtlasUrl = assetUrl("atlases/icon-atlas.png");
+const EXTRA_STRUCTURE_ICON_URLS = [
+  assetUrl("images/HousingIconWhite.svg"),
+  assetUrl("images/PublicServicesIconWhite.svg"),
+  assetUrl("images/ResearchCentreIconWhite.svg"),
+] as const;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -53,6 +61,9 @@ const STRUCTURE_ORDER = [
   UT_DEFENSE_POST,
   UT_SAM_LAUNCHER,
   UT_MISSILE_SILO,
+  UT_HOUSING,
+  UT_PUBLIC_SERVICES,
+  UT_RESEARCH_CENTRE,
 ] as const;
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;
@@ -279,14 +290,48 @@ export class StructurePass {
   }
 
   private async loadAtlas(): Promise<void> {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = iconAtlasUrl;
-    await img.decode();
+    const loadImg = async (src: string): Promise<HTMLImageElement> => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = src;
+      await img.decode();
+      return img;
+    };
+
+    const baseImg = await loadImg(iconAtlasUrl);
+    const extraImgs = await Promise.all(
+      EXTRA_STRUCTURE_ICON_URLS.map((u) => loadImg(u).catch(() => null)),
+    );
+
+    const baseCols = 6;
+    const cellW = Math.max(1, Math.floor(baseImg.width / baseCols));
+    const cellH = Math.max(1, baseImg.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = cellW * ATLAS_COLS;
+    canvas.height = cellH;
+    const ctx = canvas.getContext("2d");
+    let source: TexImageSource = baseImg;
+    if (ctx) {
+      ctx.drawImage(baseImg, 0, 0, cellW * baseCols, cellH);
+      const pad = Math.floor(Math.min(cellW, cellH) * 0.12);
+      for (let i = 0; i < extraImgs.length; i++) {
+        const extra = extraImgs[i];
+        if (!extra) continue;
+        ctx.drawImage(
+          extra,
+          (baseCols + i) * cellW + pad,
+          pad,
+          cellW - pad * 2,
+          cellH - pad * 2,
+        );
+      }
+      source = canvas;
+    }
+
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.atlasTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(
       gl.TEXTURE_2D,

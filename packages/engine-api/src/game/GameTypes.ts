@@ -17,6 +17,12 @@ export type Tick = number;
 
 export type Gold = bigint;
 
+export enum TaxRate {
+  Low = "low",
+  Normal = "normal",
+  High = "high",
+}
+
 export type WarshipState = {
   state: "patrolling" | "retreating" | "docked";
   patrolTile?: TileRef;
@@ -208,6 +214,9 @@ export enum UnitType {
   MIRVWarhead = "MIRV Warhead",
   Train = "Train",
   Factory = "Factory",
+  Housing = "Housing",
+  PublicServices = "Public Services",
+  ResearchCentre = "Research Centre",
 }
 
 export enum TrainType {
@@ -237,6 +246,9 @@ export const Structures = unitTypeGroup([
   UnitType.MissileSilo,
   UnitType.Port,
   UnitType.Factory,
+  UnitType.Housing,
+  UnitType.PublicServices,
+  UnitType.ResearchCentre,
 ] as const);
 
 export const BuildMenus = unitTypeGroup([

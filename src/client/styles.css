@@ -21,34 +21,34 @@
   --default-ring-color: var(--color-malibu-blue);
   --font-display: "OpenFront", Inter, Arial, sans-serif;
 
-  /* Openfront.io brand palette — see Openfront_Brand_Guidelines.pdf §4 */
-  --color-malibu-blue: #0084d1;
-  --color-aquarius: #3fa9f5;
-  --color-dawn-blue: #cccccc;
+  /* Crownfall Imperial Obsidian & Gold palette */
+  --color-malibu-blue: #d4af37;
+  --color-aquarius: #f5d061;
+  --color-dawn-blue: #d6d3cb;
   --color-bright-white: #ffffff;
-  --color-bright-blue: #1e90ff;
+  --color-bright-blue: #eab308;
 
-  /* Openfront Masters sub-brand */
-  --color-cyber-yellow: #ffd700;
-  --color-limestone: #999999;
+  /* Crownfall imperial highlights */
+  --color-cyber-yellow: #fde047;
+  --color-limestone: #9ca3af;
 
-  /* Background & decorative — not for standalone UI use */
-  --color-deep-navy: #0a1628;
-  --color-hex-cyan: #00c8ff;
-  --color-frame-orange: #f97316;
+  /* Background & decorative — Imperial Obsidian */
+  --color-deep-navy: #0b0e14;
+  --color-hex-cyan: #d4af37;
+  --color-frame-orange: #dc2626;
 
   /* App-specific surface colors */
-  --color-surface: #0a1628;
+  --color-surface: #111622;
 
-  --shadow-malibu-blue: 0 0 15px rgba(0, 132, 209, 0.2);
-  --shadow-malibu-blue-soft: 0 0 12px rgba(0, 132, 209, 0.2);
-  --shadow-malibu-blue-strong: 0 0 15px rgba(0, 132, 209, 0.3);
-  --shadow-malibu-blue-pill: 0 0 6px rgba(0, 132, 209, 0.35);
-  --shadow-malibu-blue-ring-sm: 0 0 0 4px rgba(0, 132, 209, 0.2);
-  --shadow-malibu-blue-ring-lg: 0 0 0 6px rgba(0, 132, 209, 0.3);
-  --shadow-lobby-card-hover: 0 0 0 2px #0084d1, 0 0 20px rgba(0, 132, 209, 0.5);
+  --shadow-malibu-blue: 0 0 15px rgba(212, 175, 55, 0.22);
+  --shadow-malibu-blue-soft: 0 0 12px rgba(212, 175, 55, 0.2);
+  --shadow-malibu-blue-strong: 0 0 16px rgba(212, 175, 55, 0.35);
+  --shadow-malibu-blue-pill: 0 0 6px rgba(212, 175, 55, 0.4);
+  --shadow-malibu-blue-ring-sm: 0 0 0 4px rgba(212, 175, 55, 0.22);
+  --shadow-malibu-blue-ring-lg: 0 0 0 6px rgba(212, 175, 55, 0.32);
+  --shadow-lobby-card-hover: 0 0 0 2px #d4af37, 0 0 20px rgba(212, 175, 55, 0.45);
   --shadow-action-card-hover:
-    0 0 0 1px #0084d1, 0 0 12px rgba(0, 132, 209, 0.35);
+    0 0 0 1px #d4af37, 0 0 12px rgba(212, 175, 55, 0.35);
 }
 
 /* Match the in-game HUD surface; opacity affects the surface, not the controls. */

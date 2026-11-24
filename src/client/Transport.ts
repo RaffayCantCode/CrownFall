@@ -4,6 +4,7 @@ import {
   GameType,
   Gold,
   PlayerID,
+  TaxRate,
   Tick,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
@@ -65,6 +66,10 @@ import { PlayerView } from "./view";
 
 export class PauseGameIntentEvent implements GameEvent {
   constructor(public readonly paused: boolean) {}
+}
+
+export class SendSetTaxRateIntentEvent implements GameEvent {
+  constructor(public readonly taxRate: TaxRate) {}
 }
 
 export class SendAllianceRequestIntentEvent implements GameEvent {
@@ -352,6 +357,9 @@ export class Transport {
     this.subscribe(BuildUnitIntentEvent, (e) => this.onBuildUnitIntent(e));
 
     this.subscribe(PauseGameIntentEvent, (e) => this.onPauseGameIntent(e));
+    this.subscribe(SendSetTaxRateIntentEvent, (e) =>
+      this.onSetTaxRateIntent(e),
+    );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
     this.subscribe(SendPlayerReportEvent, (e) =>
@@ -1017,6 +1025,13 @@ export class Transport {
     this.sendIntent({
       type: "toggle_pause",
       paused: event.paused,
+    });
+  }
+
+  private onSetTaxRateIntent(event: SendSetTaxRateIntentEvent) {
+    this.sendIntent({
+      type: "set_tax_rate",
+      taxRate: event.taxRate,
     });
   }
 

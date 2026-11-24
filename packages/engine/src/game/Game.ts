@@ -19,6 +19,7 @@ import {
   Relation,
   SamLauncherState,
   SpawnArea,
+  TaxRate,
   Team,
   TerraNullius,
   Tick,
@@ -115,6 +116,12 @@ export interface UnitParamsMap {
   [UnitType.SAMLauncher]: Record<string, never>;
 
   [UnitType.City]: Record<string, never>;
+
+  [UnitType.Housing]: Record<string, never>;
+
+  [UnitType.PublicServices]: Record<string, never>;
+
+  [UnitType.ResearchCentre]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type
@@ -386,6 +393,16 @@ export interface Player extends PlayerLike {
   troops(): number;
   setTroops(troops: number): void;
   addTroops(troops: number): void;
+
+  // Crownfall national management
+  civilianPopulation(): number;
+  addCivilianPopulation(delta: number): void;
+  science(): number;
+  addScience(delta: number): void;
+  stability(): number;
+  setStability(stability: number): void;
+  taxRate(): TaxRate;
+  setTaxRate(taxRate: TaxRate): void;
   removeTroops(troops: number): number;
 
   // Units

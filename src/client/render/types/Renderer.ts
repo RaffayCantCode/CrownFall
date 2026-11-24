@@ -93,6 +93,10 @@ export interface PlayerState {
   outgoingAllianceRequests: string[];
   alliances: AllianceData[];
   outgoingEmojis: EmojiData[];
+  civilianPopulation?: number;
+  science?: number;
+  stability?: number;
+  taxRate?: string;
 }
 
 export interface UnitState {

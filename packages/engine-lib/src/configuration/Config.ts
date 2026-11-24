@@ -242,8 +242,16 @@ export class Config {
         break;
       case UnitType.City:
       case UnitType.Factory:
+      case UnitType.Housing:
         info = {
           constructionDuration: this.instantBuild() ? 0 : 2 * 10,
+          upgradable: true,
+        };
+        break;
+      case UnitType.PublicServices:
+      case UnitType.ResearchCentre:
+        info = {
+          constructionDuration: this.instantBuild() ? 0 : 3 * 10,
           upgradable: true,
         };
         break;

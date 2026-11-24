@@ -54,19 +54,24 @@ export class DesktopNavBar extends LitElement {
     // not the sticky host, so the host's offset below a header ad stays exact.
     return html`
       <nav
-        class="hidden lg:flex w-full bg-zinc-900/90 backdrop-blur-md items-center justify-center gap-8 py-4 shrink-0 z-50 relative compact:[zoom:0.75]"
+        class="hidden lg:flex w-full bg-[#0b0e14]/92 border-b border-amber-400/25 backdrop-blur-md items-center justify-center gap-8 py-3.5 shrink-0 z-50 relative compact:[zoom:0.75]"
       >
         <div class="flex flex-col items-center justify-center">
-          <div class="h-8">
+          <div class="flex items-center gap-2.5">
             <img
-              class="block h-full aspect-[1364/259]"
-              src=${assetUrl("images/OpenFrontLogo.svg")}
-              alt="OpenFront"
+              class="block h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(212,175,55,0.45)]"
+              src=${assetUrl("images/CrownfallCrownIcon.svg")}
+              alt="Crownfall"
             />
+            <span
+              class="text-xl font-extrabold tracking-[0.18em] uppercase bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent"
+            >
+              CROWNFALL
+            </span>
           </div>
           <div
             id="game-version"
-            class="l-header__highlightText text-center"
+            class="l-header__highlightText text-center text-amber-200/60"
           ></div>
         </div>
         <button

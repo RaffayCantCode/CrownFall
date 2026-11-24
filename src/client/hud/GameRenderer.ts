@@ -38,6 +38,7 @@ import { ImmunityTimer } from "./layers/ImmunityTimer";
 import { InGamePromo } from "./layers/InGamePromo";
 import { MainRadialMenu } from "./layers/MainRadialMenu";
 import { MultiTabModal } from "./layers/MultiTabModal";
+import { NationalDashboard } from "./layers/NationalDashboard";
 import { NewLobbyPrompt } from "./layers/NewLobbyPrompt";
 import { OnboardingOverlay } from "./layers/OnboardingOverlay";
 import { PerformanceOverlay } from "./layers/PerformanceOverlay";
@@ -109,6 +110,15 @@ export function createRenderer(
   controlPanel.eventBus = eventBus;
   controlPanel.uiState = uiState;
   controlPanel.game = game;
+
+  const nationalDashboard = document.querySelector(
+    "national-dashboard",
+  ) as NationalDashboard;
+  if (!(nationalDashboard instanceof NationalDashboard)) {
+    console.error("NationalDashboard element not found in the DOM");
+  }
+  nationalDashboard.eventBus = eventBus;
+  nationalDashboard.game = game;
 
   const eventsDisplay = document.querySelector(
     "events-display",
@@ -370,6 +380,7 @@ export function createRenderer(
     gameLeftSidebar,
     unitDisplay,
     gameRightSidebar,
+    nationalDashboard,
     controlPanel,
     playerInfo,
     winModal,
@@ -397,6 +408,7 @@ export function createRenderer(
     gameLeftSidebar,
     unitDisplay,
     gameRightSidebar,
+    nationalDashboard,
     controlPanel,
     playerInfo,
     winModal,

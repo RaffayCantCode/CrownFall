@@ -18,6 +18,7 @@ import {
   PlayerType,
   Relation,
   Structures,
+  TaxRate,
   Team,
   TerraNullius,
   Tick,
@@ -33,6 +34,7 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { ReadonlyTileSet } from "@openfront/engine-api/game/ReadViews";
 import { ClientID } from "@openfront/engine-api/Schemas";
+import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { andFN, manhattanDistFN } from "@openfront/engine-lib/game/GameMapImpl";
 import { TileSet } from "@openfront/engine-lib/game/TileSet";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
@@ -140,6 +142,12 @@ export class PlayerImpl implements Player {
 
   private _gold: bigint;
   private _troops: bigint;
+
+  /** Crownfall national management state. */
+  private _civilianPopulation: number = CROWNFALL_CONFIG.startingCivilianPop;
+  private _science: number = 0;
+  private _stability: number = CROWNFALL_CONFIG.startingStability;
+  private _taxRate: TaxRate = TaxRate.Normal;
 
   /** Cumulative ship-trade revenue (arrival credit for src + dst port owners). */
   private _tradeGold: bigint = 0n;
@@ -416,6 +424,10 @@ export class PlayerImpl implements Player {
       betrayals: this._betrayalCount,
       lastDeleteUnitTick: this.lastDeleteUnitTick,
       isLobbyCreator: this.isLobbyCreator(),
+      civilianPopulation: this._civilianPopulation,
+      science: this._science,
+      stability: this._stability,
+      taxRate: this._taxRate,
     };
   }
 
@@ -1630,6 +1642,9 @@ export class PlayerImpl implements Player {
       case UnitType.SAMLauncher:
       case UnitType.City:
       case UnitType.Factory:
+      case UnitType.Housing:
+      case UnitType.PublicServices:
+      case UnitType.ResearchCentre:
         return this.landBasedStructureSpawn(targetTile, validTiles);
       default:
         assertNever(unitType);
@@ -1849,9 +1864,55 @@ export class PlayerImpl implements Player {
     return this._disconnectSnapshot?.currentTick ?? null;
   }
 
+  civilianPopulation(): number {
+    return this._civilianPopulation;
+  }
+
+  addCivilianPopulation(delta: number): void {
+    this._civilianPopulation = Math.max(
+      0,
+      this._civilianPopulation + Math.trunc(delta),
+    );
+  }
+
+  science(): number {
+    return this._science;
+  }
+
+  addScience(delta: number): void {
+    this._science = Math.max(0, this._science + Math.trunc(delta));
+  }
+
+  stability(): number {
+    return this._stability;
+  }
+
+  setStability(stability: number): void {
+    this._stability = Math.max(
+      CROWNFALL_CONFIG.minStability,
+      Math.min(CROWNFALL_CONFIG.maxStability, Math.trunc(stability)),
+    );
+  }
+
+  taxRate(): TaxRate {
+    return this._taxRate;
+  }
+
+  setTaxRate(taxRate: TaxRate): void {
+    this._taxRate = taxRate;
+  }
+
   hash(): number {
+    const taxHash =
+      this._taxRate === TaxRate.Low ? 1 : this._taxRate === TaxRate.High ? 3 : 2;
     return (
-      simpleHash(this.id()) * (this.troops() + this.numTilesOwned()) +
+      simpleHash(this.id()) *
+        (this.troops() +
+          this.numTilesOwned() +
+          this._civilianPopulation +
+          this._science +
+          this._stability * 7 +
+          taxHash) +
       this._units.reduce((acc, unit) => acc + unit.hash(), 0)
     );
   }
@@ -2034,6 +2095,10 @@ export class PlayerImpl implements Player {
       numUnitsConstructed: Object.entries(this.numUnitsConstructed).map(
         ([type, n]) => [type as UnitType, n],
       ),
+      civilianPopulation: this._civilianPopulation,
+      science: this._science,
+      stability: this._stability,
+      taxRate: this._taxRate,
     };
   }
 
@@ -2107,13 +2172,26 @@ export class PlayerImpl implements Player {
         }
       : (box as null);
     this.numUnitsConstructed = Object.fromEntries(s.numUnitsConstructed);
+    this._civilianPopulation = s.civilianPopulation;
+    this._science = s.science;
+    this._stability = s.stability;
+    this._taxRate = s.taxRate;
     this.nearbyMemo = null;
   }
 }
 
 export const PlayerSnapshot = snapshotType({
   name: "Player",
-  version: 1,
+  version: 2,
+  migrations: {
+    1: (d: Record<string, unknown>) => ({
+      ...d,
+      civilianPopulation: CROWNFALL_CONFIG.startingCivilianPop,
+      science: 0,
+      stability: CROWNFALL_CONFIG.startingStability,
+      taxRate: TaxRate.Normal,
+    }),
+  },
   schema: z.object({
     smallID: zInt(),
     info: PlayerInfoSchema,
@@ -2177,6 +2255,10 @@ export const PlayerSnapshot = snapshotType({
       .nullable()
       .optional(),
     numUnitsConstructed: z.array(z.tuple([UnitTypeSchema, zInt()])),
+    civilianPopulation: zInt(),
+    science: zInt(),
+    stability: zInt(),
+    taxRate: z.enum(TaxRate),
   }),
 });
 export type PlayerState = z.infer<typeof PlayerSnapshot.schema>;

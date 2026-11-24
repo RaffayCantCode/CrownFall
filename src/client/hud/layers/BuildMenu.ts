@@ -37,6 +37,9 @@ const atomBombIcon = assetUrl("images/NukeIconWhite.svg");
 const portIcon = assetUrl("images/PortIcon.svg");
 const samlauncherIcon = assetUrl("images/SamLauncherIconWhite.svg");
 const shieldIcon = assetUrl("images/ShieldIconWhite.svg");
+const housingIcon = assetUrl("images/HousingIconWhite.svg");
+const publicServicesIcon = assetUrl("images/PublicServicesIconWhite.svg");
+const researchCentreIcon = assetUrl("images/ResearchCentreIconWhite.svg");
 
 export interface BuildItemDisplay {
   unitType: PlayerBuildableUnitType;
@@ -116,6 +119,27 @@ const buildTable: BuildItemDisplay[][] = [
       icon: factoryIcon,
       description: "build_menu.desc.factory",
       key: "unit_type.factory",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Housing,
+      icon: housingIcon,
+      description: "build_menu.desc.housing",
+      key: "unit_type.housing",
+      countable: true,
+    },
+    {
+      unitType: UnitType.PublicServices,
+      icon: publicServicesIcon,
+      description: "build_menu.desc.public_services",
+      key: "unit_type.public_services",
+      countable: true,
+    },
+    {
+      unitType: UnitType.ResearchCentre,
+      icon: researchCentreIcon,
+      description: "build_menu.desc.research_centre",
+      key: "unit_type.research_centre",
       countable: true,
     },
   ],

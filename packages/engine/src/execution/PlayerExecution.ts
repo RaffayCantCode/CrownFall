@@ -5,6 +5,13 @@ import {
   Structures,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
+import {
+  civilianGrowthPerSecond,
+  civilianTaxGoldPerSecond,
+  computeStabilityBreakdown,
+  CROWNFALL_CONFIG,
+  sciencePerSecond,
+} from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { zInt, zPlayerRef } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { getMode, simpleHash } from "@openfront/engine-lib/Util";
 import { z } from "zod";
@@ -104,6 +111,11 @@ export class PlayerExecution implements Execution {
     // Record stats
     this.mg.stats().goldWork(this.player, goldFromWorkers);
 
+    // Crownfall national management (1Hz)
+    if (ticks % CROWNFALL_CONFIG.updateIntervalTicks === 0) {
+      this.tickCrownfallNationalManagement();
+    }
+
     for (const alliance of this.player.alliances()) {
       if (alliance.expiresAt() <= this.mg.ticks()) {
         alliance.expire();
@@ -133,6 +145,62 @@ export class PlayerExecution implements Execution {
           console.log(`player ${this.player.name()}, took ${end - start}ms`);
         }
       }
+    }
+  }
+
+  private tickCrownfallNationalManagement(): void {
+    const taxRate = this.player.taxRate();
+    const pop = this.player.civilianPopulation();
+    const breakdown = computeStabilityBreakdown(
+      this.player,
+      taxRate,
+      pop,
+      this.player.incomingAttacks().length,
+    );
+
+    const currentStability = this.player.stability();
+    let nextStability = currentStability;
+    if (currentStability < breakdown.target) {
+      nextStability = Math.min(
+        breakdown.target,
+        currentStability + CROWNFALL_CONFIG.stabilityStepPerSecond,
+      );
+    } else if (currentStability > breakdown.target) {
+      nextStability = Math.max(
+        breakdown.target,
+        currentStability - CROWNFALL_CONFIG.stabilityStepPerSecond,
+      );
+    }
+    if (nextStability !== currentStability) {
+      this.player.setStability(nextStability);
+    }
+
+    const popDelta = civilianGrowthPerSecond(
+      this.player,
+      pop,
+      nextStability,
+      taxRate,
+    );
+    if (popDelta !== 0) {
+      this.player.addCivilianPopulation(popDelta);
+    }
+
+    const updatedPop = this.player.civilianPopulation();
+    const taxGold = civilianTaxGoldPerSecond(
+      this.player,
+      updatedPop,
+      nextStability,
+      taxRate,
+      this.config.goldMultiplier(),
+    );
+    if (taxGold > 0n) {
+      this.player.addGold(taxGold);
+      this.mg.stats().goldWork(this.player, taxGold);
+    }
+
+    const sciGain = sciencePerSecond(this.player, updatedPop, nextStability);
+    if (sciGain > 0) {
+      this.player.addScience(sciGain);
     }
   }
 

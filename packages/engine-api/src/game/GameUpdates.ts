@@ -10,6 +10,7 @@ import {
   PlayerID,
   PlayerType,
   SamLauncherState,
+  TaxRate,
   Team,
   Tick,
   TrainType,
@@ -288,6 +289,11 @@ export interface PlayerUpdate {
   betrayals?: number;
   lastDeleteUnitTick?: Tick;
   isLobbyCreator?: boolean;
+  /** Crownfall national management state (updated at 1Hz). */
+  civilianPopulation?: number;
+  science?: number;
+  stability?: number;
+  taxRate?: TaxRate;
 }
 
 export interface AllianceView {
