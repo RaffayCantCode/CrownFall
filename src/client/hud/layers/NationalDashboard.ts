@@ -18,7 +18,6 @@ import {
   GameUpdateType,
 } from "@openfront/engine-api/game/GameUpdates";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
-import { getAugmentDefinition } from "@openfront/engine-lib/configuration/CrownfallAugments";
 import {
   computeStabilityBreakdown,
   maxCivilianPopulation,
@@ -86,7 +85,6 @@ import {
   samLauncherIcon,
   warshipIcon,
 } from "../HotbarIcons";
-import { renderAugmentEmblem } from "./CrownfallEmblems";
 
 const militaryPathIcon = assetUrl("images/crownfall/path-military.svg");
 const politicalPathIcon = assetUrl("images/crownfall/path-political.svg");
@@ -292,15 +290,6 @@ type OpenHudMenu =
   | "ops"
   | "alliances";
 
-type OpsFilterMode = "doctrine" | "all";
-
-interface DiplomaticLogEntry {
-  id: number;
-  tick: Tick;
-  accepted: boolean;
-  text: string;
-}
-
 interface OutgoingActionState {
   actionType: AllianceActionType;
   sentAt: Tick;
@@ -364,11 +353,8 @@ export class NationalDashboard extends LitElement implements Controller {
   @state() private _arsenalAlert = false;
   @state() private _alliancesAlert = false;
   @state() private _openPanel: OpenHudMenu = "none";
-  @state() private _opsFilter: OpsFilterMode = "doctrine";
   @state() private _hudPosition: HudPosition = new UserSettings().hudPosition();
   @state() private _showDots: boolean = new UserSettings().hudNotificationDots();
-  @state() private _jointTargetByAlly = new Map<string, string>();
-  @state() private _latestDiplomaticBanner: DiplomaticLogEntry | null = null;
 
   private _playerBuildables: BuildableUnit[] = [];
   private _buildablesRefreshTick = -10;
@@ -377,8 +363,6 @@ export class NationalDashboard extends LitElement implements Controller {
   private _buildablesSeeded = false;
   private _incomingActionRequests: AllianceActionRequestUpdate[] = [];
   private _outgoingActionByAlly = new Map<string, OutgoingActionState>();
-  private _diplomaticLog: DiplomaticLogEntry[] = [];
-  private _nextLogId = 1;
   private _knownIncomingAllianceCount = 0;
 
   private onHudSettingsChanged = () => {
@@ -448,7 +432,6 @@ export class NationalDashboard extends LitElement implements Controller {
   init(): void {
     this._visible = false;
     this._openPanel = "none";
-    this._opsFilter = "doctrine";
     this._playerBuildables = [];
     this._buildablesRefreshTick = -10;
     this._knownCivicAffordable.clear();
@@ -459,9 +442,6 @@ export class NationalDashboard extends LitElement implements Controller {
     this._alliancesAlert = false;
     this._incomingActionRequests = [];
     this._outgoingActionByAlly.clear();
-    this._jointTargetByAlly.clear();
-    this._diplomaticLog = [];
-    this._latestDiplomaticBanner = null;
     this._knownIncomingAllianceCount = 0;
   }
 
@@ -574,14 +554,6 @@ export class NationalDashboard extends LitElement implements Controller {
   }
 
   private processAllianceUpdates(myPlayer: PlayerView, nowTick: Tick): void {
-    // Expire old banner after 7 seconds (70 ticks)
-    if (
-      this._latestDiplomaticBanner !== null &&
-      nowTick - this._latestDiplomaticBanner.tick > 70
-    ) {
-      this._latestDiplomaticBanner = null;
-    }
-
     // Prune expired incoming action requests
     if (this._incomingActionRequests.length > 0) {
       this._incomingActionRequests = this._incomingActionRequests.filter(
@@ -661,8 +633,8 @@ export class NationalDashboard extends LitElement implements Controller {
               });
             }
           }
-          const text = this.formatAllianceReplyText(rep);
-          this.pushDiplomaticLog(nowTick, rep.accepted, text);
+          this.formatAllianceReplyText(rep);
+          // Notification handled by bottom-right events panel
           if (this._openPanel !== "alliances") {
             this._alliancesAlert = true;
           }
@@ -674,14 +646,7 @@ export class NationalDashboard extends LitElement implements Controller {
     if (allianceReplies && allianceReplies.length > 0) {
       for (const rep of allianceReplies) {
         if (rep.request.requestorID === myPlayer.smallID()) {
-          const other = this.game.playerBySmallID(
-            rep.request.recipientID,
-          ) as PlayerView | null;
-          const name = other?.displayName?.() ?? "Nation";
-          const text = rep.accepted
-            ? translateText("crownfall.alliance.log_pact_accepted", { name })
-            : translateText("crownfall.alliance.log_pact_rejected", { name });
-          this.pushDiplomaticLog(nowTick, rep.accepted, text);
+          // Notification handled by bottom-right events panel
           if (this._openPanel !== "alliances") {
             this._alliancesAlert = true;
           }
@@ -763,21 +728,6 @@ export class NationalDashboard extends LitElement implements Controller {
       name,
       action: actionLabel,
     });
-  }
-
-  private pushDiplomaticLog(
-    tick: Tick,
-    accepted: boolean,
-    text: string,
-  ): void {
-    const entry: DiplomaticLogEntry = {
-      id: this._nextLogId++,
-      tick,
-      accepted,
-      text,
-    };
-    this._diplomaticLog = [entry, ...this._diplomaticLog].slice(0, 6);
-    this._latestDiplomaticBanner = entry;
   }
 
   private updateBuildingAffordabilityAlerts(): void {
@@ -1224,11 +1174,11 @@ export class NationalDashboard extends LitElement implements Controller {
     return html`
       <div
         class="${this.popoverPositionClass(
-          "wide",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-5 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+          "medium",
+        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-4 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
       >
         <div
-          class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 mb-3.5"
+          class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-2.5 mb-3"
         >
           <div>
             <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
@@ -1274,28 +1224,11 @@ export class NationalDashboard extends LitElement implements Controller {
 
         ${
           mods
-            ? html`<div
-                class="mb-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.08] bg-[#101622]/90 px-3 py-2 text-[11px] font-mono text-slate-300"
-              >
-                <span class="font-sans font-bold uppercase tracking-wider text-[#f3d27a]">
-                  Active Modifiers:
-                </span>
-                <span>Army Cap ${mods.maxTroopsPercent}%</span>
-                <span>·</span>
-                <span>Regen ${mods.troopRegenPercent}%</span>
-                <span>·</span>
-                <span>Atk Spd ${mods.attackSpeedPercent}%</span>
-                <span>·</span>
-                <span>Build Cost ${mods.structureCostPercent}%</span>
-                <span>·</span>
-                <span>Trade ${mods.tradeIncomePercent}%</span>
-                <span>·</span>
-                <span>Science ${mods.scienceRatePercent}%</span>
-              </div>`
+            ? nothing
             : nothing
         }
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 max-h-[58dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 max-h-[42dvh] overflow-y-auto pr-1">
           ${ALL_PATHS.map(({ path, icon, accentBorder, accentText, pipBg }) => {
             const level = pathLevelFor(this._progress, path);
             const maxTier = maxTierForPath(primary, path);
@@ -1385,20 +1318,7 @@ export class NationalDashboard extends LitElement implements Controller {
                   </div>
 
                   ${nextTierDef && !cappedSecondary
-                    ? html`
-                        <div class="mb-3 rounded-lg border border-white/[0.07] bg-[#0b0f18] p-2.5 space-y-1">
-                          <div class="font-bold text-xs text-[#f3d27a]">
-                            Next Breakthrough — T${nextTierDef.tier}:
-                            ${translateText(nextTierDef.nameKey)}
-                          </div>
-                          <div class="text-xs text-emerald-400 leading-snug">
-                            ${formatProText(translateText(nextTierDef.proKey))}
-                          </div>
-                          <div class="text-xs text-rose-400 leading-snug">
-                            ${formatConText(translateText(nextTierDef.conKey))}
-                          </div>
-                        </div>
-                      `
+                    ? nothing
                     : html`
                         <div class="mb-3 text-xs text-slate-300 italic">
                           ${cappedSecondary
@@ -1446,17 +1366,18 @@ export class NationalDashboard extends LitElement implements Controller {
   }
 
   private getDisplayedProjects(): readonly NationalProjectDefinition[] {
-    if (this._opsFilter === "all" || this._progress.primaryPath === null) {
-      return ALL_NATIONAL_PROJECTS;
+    if (this._progress.primaryPath === null) {
+      // No primary chosen yet — show first 6 projects
+      return ALL_NATIONAL_PROJECTS.slice(0, 6);
     }
     const primary = this._progress.primaryPath;
     // Show all 4 signature operations of your chosen Primary Path PLUS any
-    // cross-path operations you unlocked on Secondary Paths!
+    // cross-path operations you unlocked on Secondary Paths (capped at 6).
     return ALL_NATIONAL_PROJECTS.filter(
       (def) =>
         def.requiredPath === primary ||
         isProjectUnlocked(this._progress, def.id),
-    );
+    ).slice(0, 6);
   }
 
   private renderOpsPanel() {
@@ -1477,11 +1398,11 @@ export class NationalDashboard extends LitElement implements Controller {
     return html`
       <div
         class="${this.popoverPositionClass(
-          "wide",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-5 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+          "medium",
+        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-4 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
       >
         <div
-          class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3 mb-4"
+          class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5 mb-3"
         >
           <div>
             <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
@@ -1497,45 +1418,16 @@ export class NationalDashboard extends LitElement implements Controller {
             }
           </div>
 
-          <div class="flex items-center gap-2">
-            <div
-              class="inline-flex rounded-lg border border-white/10 bg-[#101622] p-0.5 text-xs"
-            >
-              <button
-                type="button"
-                @click=${() => (this._opsFilter = "doctrine")}
-                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                  this._opsFilter === "doctrine"
-                    ? "bg-[#d4af37] text-[#080b12]"
-                    : "text-slate-300 hover:text-[#f3d27a]"
-                }"
-              >
-                My Doctrine
-              </button>
-              <button
-                type="button"
-                @click=${() => (this._opsFilter = "all")}
-                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                  this._opsFilter === "all"
-                    ? "bg-[#d4af37] text-[#080b12]"
-                    : "text-slate-300 hover:text-[#f3d27a]"
-                }"
-              >
-                All Paths (${ALL_NATIONAL_PROJECTS.length})
-              </button>
-            </div>
-
-            <button
-              type="button"
-              @click=${() => this.togglePanel("ops")}
-              class="text-slate-400 hover:text-white px-1.5 text-base cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            @click=${() => this.togglePanel("ops")}
+            class="text-slate-400 hover:text-white px-1.5 text-base cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[54dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[42dvh] overflow-y-auto pr-1">
           ${displayedProjects.map((def) => {
             const unlocked = isProjectUnlocked(this._progress, def.id);
             const isActive = this._activeProject === def.id;
@@ -1562,21 +1454,21 @@ export class NationalDashboard extends LitElement implements Controller {
 
             return html`
               <div
-                class="flex flex-col justify-between rounded-xl border p-3.5 bg-[#101622] ${isActive
+                class="flex flex-col justify-between rounded-xl border p-3 bg-[#101622] ${isActive
                   ? "border-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.28)]"
                   : unlocked
                     ? "border-[#d4af37]/40"
                     : "border-white/10 opacity-75"}"
               >
                 <div>
-                  <div class="flex items-center justify-between gap-2 mb-1.5">
+                  <div class="flex items-center justify-between gap-2 mb-1">
                     <div class="flex items-center gap-2 min-w-0">
                       <img
                         src=${PROJECT_ICONS[def.id]}
                         alt=""
-                        class="w-5 h-5 shrink-0 object-contain"
+                        class="w-4 h-4 shrink-0 object-contain"
                       />
-                      <span class="font-bold text-sm text-[#f3d27a] truncate">
+                      <span class="font-bold text-xs text-[#f3d27a] truncate">
                         ${translateText(def.nameKey)}
                       </span>
                     </div>
@@ -1587,10 +1479,10 @@ export class NationalDashboard extends LitElement implements Controller {
                       T${def.requiredTier} · ${Math.round(def.durationTicks / 10)}s
                     </span>
                   </div>
-                  <div class="text-xs leading-snug text-emerald-400 mb-1">
+                  <div class="text-[11px] leading-snug text-emerald-400 truncate">
                     ${formatProText(translateText(def.proKey))}
                   </div>
-                  <div class="text-xs leading-snug text-rose-400 mb-3">
+                  <div class="text-[11px] leading-snug text-rose-400 truncate mb-2">
                     ${formatConText(translateText(def.conKey))}
                   </div>
                 </div>
@@ -1639,91 +1531,8 @@ export class NationalDashboard extends LitElement implements Controller {
             `;
           })}
         </div>
-
-        <!-- Drafted National Choices Summary -->
-        <div
-          class="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2"
-        >
-          <span class="text-xs uppercase tracking-wider text-[#9aa3b2]">
-            National Choices (${this._selectedAugments.length} / 5)
-          </span>
-          <div class="flex flex-wrap items-center gap-2">
-            ${
-              this._selectedAugments.length === 0
-                ? html`<span class="text-xs text-slate-400 italic"
-                    >None drafted yet</span
-                  >`
-                : this._selectedAugments.map((id) => {
-                    const def = getAugmentDefinition(id);
-                    return html`<span
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-[#d4af37]/35 bg-[#101622] px-2.5 py-1 text-xs font-semibold text-[#f3d27a]"
-                    >
-                      <span
-                        class="w-4 h-4 inline-flex items-center justify-center"
-                        >${renderAugmentEmblem(id)}</span
-                      >
-                      ${translateText(def.nameKey)}
-                    </span>`;
-                  })
-            }
-          </div>
-        </div>
       </div>
     `;
-  }
-
-  private getEnemyCandidatesForAlly(
-    myPlayer: PlayerView,
-    ally: PlayerView,
-  ): PlayerView[] {
-    const seen = new Set<string>();
-    const prioritized: PlayerView[] = [];
-
-    for (const inc of myPlayer.incomingAttacks()) {
-      const att = this.game.playerBySmallID(inc.attackerID) as PlayerView | null;
-      if (
-        att &&
-        att.isAlive() &&
-        att !== myPlayer &&
-        !ally.isFriendly(att) &&
-        !myPlayer.isFriendly(att) &&
-        !seen.has(att.id())
-      ) {
-        seen.add(att.id());
-        prioritized.push(att);
-      }
-    }
-    for (const out of myPlayer.outgoingAttacks()) {
-      const tgt = this.game.playerBySmallID(out.targetID) as PlayerView | null;
-      if (
-        tgt &&
-        tgt.isAlive() &&
-        tgt !== myPlayer &&
-        !ally.isFriendly(tgt) &&
-        !myPlayer.isFriendly(tgt) &&
-        !seen.has(tgt.id())
-      ) {
-        seen.add(tgt.id());
-        prioritized.push(tgt);
-      }
-    }
-
-    const others = this.game
-      .playerViews()
-      .filter(
-        (p) =>
-          p !== myPlayer &&
-          p !== ally &&
-          p.isAlive() &&
-          p.type() !== PlayerType.Bot &&
-          !myPlayer.isFriendly(p) &&
-          !ally.isFriendly(p) &&
-          !seen.has(p.id()),
-      )
-      .sort((a, b) => b.troops() - a.troops())
-      .slice(0, 8);
-
-    return [...prioritized, ...others];
   }
 
   private renderAlliancesPanel() {
@@ -1751,35 +1560,21 @@ export class NationalDashboard extends LitElement implements Controller {
             p.isRequestingAllianceWith(myPlayer),
         );
 
-    const outreachCandidates = alliancesDisabled
-      ? []
-      : allPlayers
-          .filter(
-            (p) =>
-              p !== myPlayer &&
-              p.isAlive() &&
-              p.type() !== PlayerType.Bot &&
-              !myPlayer.isFriendly(p) &&
-              !p.isRequestingAllianceWith(myPlayer),
-          )
-          .sort((a, b) => b.numTilesOwned() - a.numTilesOwned())
-          .slice(0, 10);
-
     const canDonateGoldHuman = this.game.config().gameConfig().donateGold;
     const canDonateTroopsHuman = this.game.config().gameConfig().donateTroops;
 
     return html`
       <div
         class="${this.popoverPositionClass(
-          "wide",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-5 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+          "medium",
+        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-4 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
       >
         <div
-          class="flex items-center justify-between border-b border-white/10 pb-3 mb-3.5"
+          class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3"
         >
           <div>
             <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
-              Alliances &amp; Sovereign Diplomacy
+              Alliances
             </span>
             <span class="ml-2 text-xs text-[#9aa3b2]">
               Active Allies: ${allies.length}
@@ -1794,36 +1589,7 @@ export class NationalDashboard extends LitElement implements Controller {
           </button>
         </div>
 
-        <div class="space-y-4 max-h-[62dvh] overflow-y-auto pr-1">
-          <!-- Recent Diplomatic Responses Log -->
-          ${
-            this._diplomaticLog.length > 0
-              ? html`
-                  <div class="rounded-xl border border-white/10 bg-[#0d131f] p-3 space-y-1.5">
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-[#f3d27a]">
-                      Diplomatic Dispatches
-                    </div>
-                    ${this._diplomaticLog.slice(0, 3).map(
-                      (entry) => html`
-                        <div
-                          class="flex items-center gap-2 text-xs font-medium ${
-                            entry.accepted
-                              ? "text-emerald-300"
-                              : "text-rose-300"
-                          }"
-                        >
-                          <span class="font-bold"
-                            >${entry.accepted ? "✓" : "✕"}</span
-                          >
-                          <span>${entry.text}</span>
-                        </div>
-                      `,
-                    )}
-                  </div>
-                `
-              : nothing
-          }
-
+        <div class="space-y-3 max-h-[45dvh] overflow-y-auto pr-1">
           <!-- Incoming Allied Pact Requests (Troops/Gold/Joint Attack) -->
           ${
             this._incomingActionRequests.length > 0
@@ -2047,19 +1813,7 @@ export class NationalDashboard extends LitElement implements Controller {
                             canDonateTroopsHuman) &&
                           myPlayer.troops() > 100;
 
-                        const enemies = this.getEnemyCandidatesForAlly(
-                          myPlayer,
-                          ally,
-                        );
-                        const selectedEnemyId =
-                          this._jointTargetByAlly.get(ally.id()) ??
-                          enemies[0]?.id() ??
-                          "";
-                        const validTargetId = enemies.some(
-                          (e) => e.id() === selectedEnemyId,
-                        )
-                          ? selectedEnemyId
-                          : (enemies[0]?.id() ?? "");
+
 
                         return html`
                           <div
@@ -2282,7 +2036,7 @@ export class NationalDashboard extends LitElement implements Controller {
                                     new SendAllianceActionRequestIntentEvent(
                                       ally.id(),
                                       AllianceActionType.DefenseAid,
-                                      validTargetId || null,
+                                      null,
                                     ),
                                   )}
                                 class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
@@ -2332,143 +2086,14 @@ export class NationalDashboard extends LitElement implements Controller {
                                 </button>
                               </div>
                             </div>
-
-                            <!-- Joint Attack Target Row -->
-                            ${
-                              enemies.length > 0
-                                ? html`
-                                    <div
-                                      class="flex items-center gap-2 pt-1 border-t border-white/[0.06]"
-                                    >
-                                      <span
-                                        class="text-[11px] font-semibold uppercase tracking-wider text-rose-300 shrink-0"
-                                      >
-                                        Joint Attack:
-                                      </span>
-                                      <select
-                                        .value=${validTargetId}
-                                        @change=${(e: Event) => {
-                                          const val = (
-                                            e.target as HTMLSelectElement
-                                          ).value;
-                                          const next = new Map(
-                                            this._jointTargetByAlly,
-                                          );
-                                          next.set(ally.id(), val);
-                                          this._jointTargetByAlly = next;
-                                        }}
-                                        class="min-w-0 flex-1 rounded-lg border border-white/15 bg-[#080b12] px-2.5 py-1 text-xs text-slate-200"
-                                      >
-                                        ${enemies.map(
-                                          (en) => html`
-                                            <option value=${en.id()}>
-                                              ${en.displayName()}
-                                              (${renderTroops(en.troops())})
-                                            </option>
-                                          `,
-                                        )}
-                                      </select>
-                                      <button
-                                        type="button"
-                                        ?disabled=${
-                                          actionBusy || !validTargetId
-                                        }
-                                        @click=${() => {
-                                          if (!validTargetId) return;
-                                          this.eventBus?.emit(
-                                            new SendAllianceActionRequestIntentEvent(
-                                              ally.id(),
-                                              AllianceActionType.JointAttack,
-                                              validTargetId,
-                                            ),
-                                          );
-                                        }}
-                                        class="shrink-0 rounded-lg border px-3 py-1 text-xs font-bold transition ${
-                                          !actionBusy && validTargetId
-                                            ? "border-rose-400/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 cursor-pointer"
-                                            : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                        }"
-                                      >
-                                        Launch Strike
-                                      </button>
-                                    </div>
-                                  `
-                                : nothing
-                            }
-                          </div>
-                        `;
+                        </div>
+                      `;
                       })}
                     </div>
                   `
             }
           </div>
 
-          <!-- Diplomatic Outreach: Propose New Alliances directly from Panel -->
-          ${
-            !alliancesDisabled && outreachCandidates.length > 0
-              ? html`
-                  <div>
-                    <div
-                      class="mb-2 text-xs font-semibold uppercase tracking-widest text-[#9aa3b2]"
-                    >
-                      Diplomatic Outreach — Propose New Alliance
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      ${outreachCandidates.map((cand) => {
-                        const alreadySent =
-                          myPlayer.isRequestingAllianceWith(cand);
-                        return html`
-                          <div
-                            class="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#101622] px-3 py-2"
-                          >
-                            <div class="min-w-0">
-                              <div
-                                class="text-xs font-bold text-[#f4f1ea] truncate"
-                              >
-                                ${cand.displayName()}
-                              </div>
-                              <div class="text-[11px] text-[#9aa3b2] font-mono">
-                                ${renderTroops(cand.troops())} troops
-                              </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new GoToPlayerEvent(cand),
-                                  )}
-                                class="rounded border border-white/10 bg-[#171f2e] px-2 py-1 text-[11px] text-slate-300 hover:text-white cursor-pointer"
-                              >
-                                Locate
-                              </button>
-                              <button
-                                type="button"
-                                ?disabled=${alreadySent}
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceRequestIntentEvent(
-                                      myPlayer,
-                                      cand,
-                                    ),
-                                  )}
-                                class="rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                                  alreadySent
-                                    ? "bg-amber-500/20 border border-amber-400/40 text-amber-200 cursor-default"
-                                    : "bg-[#d4af37]/20 border border-[#d4af37]/50 hover:bg-[#d4af37]/30 text-[#f3d27a] cursor-pointer"
-                                }"
-                              >
-                                ${alreadySent ? "Sent…" : "Propose"}
-                              </button>
-                            </div>
-                          </div>
-                        `;
-                      })}
-                    </div>
-                  </div>
-                `
-              : nothing
-          }
         </div>
       </div>
     `;
@@ -2561,43 +2186,16 @@ export class NationalDashboard extends LitElement implements Controller {
 
     return html`
       <div
-        class="relative border-t border-white/[0.08] px-3.5 py-2.5 text-sm text-slate-100 select-none"
+        class="relative border-t border-white/[0.08] px-3 py-2 text-sm text-slate-100 select-none"
       >
-        <!-- Live Diplomatic Reply Toast Banner (even when Alliances tab is closed) -->
-        ${
-          this._latestDiplomaticBanner !== null &&
-          this._openPanel !== "alliances"
-            ? html`
-                <button
-                  type="button"
-                  @click=${() => {
-                    this._latestDiplomaticBanner = null;
-                    this.togglePanel("alliances");
-                  }}
-                  class="mb-2 w-full flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold shadow-lg transition cursor-pointer ${
-                    this._latestDiplomaticBanner.accepted
-                      ? "border-emerald-400/60 bg-emerald-950/90 text-emerald-200"
-                      : "border-rose-400/60 bg-rose-950/90 text-rose-200"
-                  }"
-                >
-                  <span class="truncate">
-                    ${this._latestDiplomaticBanner.accepted ? "✓" : "✕"}
-                    ${this._latestDiplomaticBanner.text}
-                  </span>
-                  <span class="shrink-0 text-[10px] uppercase tracking-wider opacity-80">
-                    Open Alliances →
-                  </span>
-                </button>
-              `
-            : nothing
-        }
+        <!-- Live Diplomatic Reply Toast Banner (removed — notifications appear in bottom-right events panel) -->
 
         ${this.renderStabilityPanel()} ${this.renderBuildingsPanel()}
         ${this.renderArsenalPanel()} ${this.renderPathsPanel()}
         ${this.renderOpsPanel()} ${this.renderAlliancesPanel()}
 
         <!-- Top Strip: Larger, Crisp National Vitals -->
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
           <div class="flex flex-wrap items-center gap-4">
             <!-- Civilians -->
             <div

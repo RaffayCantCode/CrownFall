@@ -782,7 +782,7 @@ export class GameModeSelector extends LitElement {
                 <img
                   src=${assetUrl("images/crownfall/logo-crown.svg")}
                   alt="Crownfall"
-                  class="h-14 w-14 object-contain drop-shadow-[0_0_14px_rgba(243,210,122,0.5)]"
+                  class="h-16 w-16 object-contain drop-shadow-[0_0_14px_rgba(219,169,110,0.45)]"
                   draggable="false"
                 />
               </div>
