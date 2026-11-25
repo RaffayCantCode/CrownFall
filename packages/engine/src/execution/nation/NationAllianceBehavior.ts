@@ -1,9 +1,12 @@
 import {
+  AllianceActionType,
   Difficulty,
   GameMode,
   PlayerType,
   Relation,
+  Tick,
 } from "@openfront/engine-api/game/GameTypes";
+import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   readVersioned,
@@ -89,6 +92,98 @@ export class NationAllianceBehavior {
       this.game.addExecution(
         new AllianceExtensionExecution(this.player, human.id()),
       );
+    }
+  }
+
+  handleAllianceActionRequests(currentTick: Tick) {
+    if (this.game.config().disableAlliances()) return;
+    const pending = this.game.pendingAllianceActionsFor(this.player);
+    if (pending.length === 0) return;
+
+    for (const req of pending) {
+      // Short ~1.2s natural deliberation window before replying
+      if (currentTick - req.createdAt < 12) continue;
+      if (!this.game.hasPlayer(req.requestorID)) {
+        this.game.replyAllianceActionRequest(this.player, req.id, false);
+        continue;
+      }
+      const requestor = this.game.player(req.requestorID);
+      const accept = this.evaluateAllianceActionRequest(
+        requestor,
+        req.actionType,
+        req.targetID,
+      );
+      const replied = this.game.replyAllianceActionRequest(
+        this.player,
+        req.id,
+        accept,
+      );
+      if (replied) {
+        this.emojiBehavior.sendEmoji(
+          requestor,
+          accept ? EMOJI_HANDSHAKE : EMOJI_CONFUSED,
+        );
+      }
+    }
+  }
+
+  private evaluateAllianceActionRequest(
+    requestor: Player,
+    actionType: AllianceActionType,
+    targetID: string | null,
+  ): boolean {
+    if (!requestor.isAlive() || !this.player.isFriendly(requestor)) {
+      return false;
+    }
+    if (requestor.isTraitor()) {
+      return false;
+    }
+    const rel = this.player.relation(requestor);
+    if (rel < Relation.Neutral) {
+      return false;
+    }
+
+    const maxTroops = Math.max(1, this.game.config().maxTroops(this.player));
+    const troopRatio = this.player.troops() / maxTroops;
+    const underHeavyAttack = this.player.incomingAttacks().length > 0;
+    const isFriendlyRel = rel >= Relation.Friendly;
+
+    switch (actionType) {
+      case AllianceActionType.TroopsForGold: {
+        // Requestor pays Gold for 25% of our troops — lucrative deal unless we are overrun or depleted
+        if (underHeavyAttack && troopRatio < 0.45) return false;
+        if (troopRatio < 0.2) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 92 : 82);
+      }
+      case AllianceActionType.GoldForTroops: {
+        // Requestor sends troops in exchange for our Gold
+        if (this.player.gold() < CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinPayout) {
+          return false;
+        }
+        if (troopRatio > 0.9) return false;
+        return this.random.nextInt(0, 100) < (underHeavyAttack ? 95 : 80);
+      }
+      case AllianceActionType.Reinforcements: {
+        if (underHeavyAttack || troopRatio < 0.3) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 80 : 60);
+      }
+      case AllianceActionType.GoldAid: {
+        if (this.player.gold() < 80_000n) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 75 : 55);
+      }
+      case AllianceActionType.DefenseAid: {
+        if (troopRatio < 0.22) return false;
+        return this.random.nextInt(0, 100) < (underHeavyAttack ? 45 : 85);
+      }
+      case AllianceActionType.JointAttack: {
+        if (targetID === null || !this.game.hasPlayer(targetID)) return false;
+        const target = this.game.player(targetID);
+        if (!target.isAlive() || this.player.isFriendly(target)) return false;
+        if (underHeavyAttack || troopRatio < 0.25) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 85 : 68);
+      }
+      default:
+        assertNever(actionType);
     }
   }
 

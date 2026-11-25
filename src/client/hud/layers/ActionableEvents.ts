@@ -250,6 +250,18 @@ export class ActionableEvents extends LitElement implements Controller {
         : translateText("crownfall.alliance.req_defense_aid", {
             name: requestor.displayName(),
           });
+    } else if (update.actionType === AllianceActionType.TroopsForGold) {
+      description = translateText("crownfall.alliance.req_troops_for_gold", {
+        name: requestor.displayName(),
+      });
+    } else if (update.actionType === AllianceActionType.GoldForTroops) {
+      description = translateText("crownfall.alliance.req_gold_for_troops", {
+        name: requestor.displayName(),
+      });
+    } else if (update.actionType === AllianceActionType.GoldAid) {
+      description = translateText("crownfall.alliance.req_gold_aid", {
+        name: requestor.displayName(),
+      });
     } else {
       description = translateText("crownfall.alliance.req_reinforcements", {
         name: requestor.displayName(),
@@ -295,8 +307,16 @@ export class ActionableEvents extends LitElement implements Controller {
     });
   }
 
-  onAllianceActionReplyEvent(_update: AllianceActionReplyUpdate) {
-    // Handled cleanly; requestor sees troop/attack updates directly on map & HUD.
+  onAllianceActionReplyEvent(update: AllianceActionReplyUpdate) {
+    const myPlayer = this.game.myPlayer();
+    if (!myPlayer || update.requestorID !== myPlayer.smallID()) {
+      return;
+    }
+    this.eventBus.emit(
+      new PlaySoundEffectEvent(
+        update.accepted ? "alliance-accepted" : "alliance-declined",
+      ),
+    );
   }
 
   onAllianceRequestEvent(update: AllianceRequestUpdate) {

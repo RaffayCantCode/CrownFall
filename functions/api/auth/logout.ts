@@ -7,10 +7,9 @@ import {
 } from "../_auth";
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const dbOrError = requireDb(context.env);
-  if (dbOrError instanceof Response) return dbOrError;
+  const db = await requireDb(context.env);
 
-  await revokeCurrentSession(dbOrError, context.request);
+  await revokeCurrentSession(db, context.request);
   return jsonResponse({ ok: true }, 200, {
     "Set-Cookie": clearSessionCookie(context.request),
   });

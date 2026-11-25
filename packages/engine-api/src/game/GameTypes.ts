@@ -48,12 +48,27 @@ export enum AllianceActionType {
   JointAttack = "joint_attack",
   Reinforcements = "reinforcements",
   DefenseAid = "defense_aid",
+  TroopsForGold = "troops_for_gold",
+  GoldForTroops = "gold_for_troops",
+  GoldAid = "gold_aid",
 }
 
 export enum NationalProject {
+  // Military Path Operations (T1–T4)
+  FrontlineConscription = "frontline_conscription",
   SurgeMobilisation = "surge_mobilisation",
+  ArmoredSpearhead = "armored_spearhead",
+  DefconBarrage = "defcon_barrage",
+  // Political Path Operations (T1–T4)
+  WarBonds = "war_bonds",
   NationalReconciliation = "national_reconciliation",
+  SovereignBastion = "sovereign_bastion",
+  ImperialGoldenAge = "imperial_golden_age",
+  // Scientific Path Operations (T1–T4)
+  ResearchGrant = "research_grant",
   EmpOverdrive = "emp_overdrive",
+  DroneFoundry = "drone_foundry",
+  OrbitalAegis = "orbital_aegis",
 }
 
 export type WarshipState = {

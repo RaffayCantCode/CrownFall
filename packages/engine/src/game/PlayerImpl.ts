@@ -45,7 +45,10 @@ import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallC
 import {
   computeCrownfallPathModifiers,
   type CrownfallPathModifiers,
+  DEV_PATH_TIERS,
+  nextTierGoldCost,
   nextTierScienceCost,
+  pathLevelFor,
   type PathProgress,
 } from "@openfront/engine-lib/configuration/CrownfallPaths";
 import {
@@ -1986,7 +1989,7 @@ export class PlayerImpl implements Player {
   }
 
   activateNationalProject(project: NationalProject): boolean {
-    if (!this.isAlive()) return false;
+    if (!this.isAlive() || this.mg.config().disablePaths()) return false;
     const now = this.mg.ticks();
     this.clearExpiredProject(now);
     if (this._activeProject !== null) return false;
@@ -1998,7 +2001,19 @@ export class PlayerImpl implements Player {
     if (this._gold < def.goldCost) return false;
 
     this._science -= def.scienceCost;
-    this.removeGold(def.goldCost);
+    if (def.goldCost > 0n) {
+      this.removeGold(def.goldCost);
+    }
+
+    if (def.immediateGoldGrant > 0n) {
+      this.addGold(def.immediateGoldGrant);
+    }
+    if (def.immediateScienceGrant > 0) {
+      this.addScience(def.immediateScienceGrant);
+    }
+    if (def.immediateCivilianGrant > 0) {
+      this.addCivilianPopulation(def.immediateCivilianGrant);
+    }
 
     if (def.mobilisationCapPercent > 0) {
       const cap = this.mg.config().maxTroops(this);
@@ -2109,11 +2124,25 @@ export class PlayerImpl implements Player {
   }
 
   unlockDevTier(path: DevelopmentPath): boolean {
-    const cost = nextTierScienceCost(this.pathProgress(), path);
-    if (cost === null || this._science < cost) {
+    if (this.mg.config().disablePaths()) {
       return false;
     }
-    this._science -= cost;
+    const progress = this.pathProgress();
+    const sciCost = nextTierScienceCost(progress, path);
+    const goldCost = nextTierGoldCost(progress, path);
+    if (
+      sciCost === null ||
+      goldCost === null ||
+      this._science < sciCost ||
+      this._gold < goldCost
+    ) {
+      return false;
+    }
+    const tierDef = DEV_PATH_TIERS[path][pathLevelFor(progress, path)];
+    this._science -= sciCost;
+    if (goldCost > 0n) {
+      this.removeGold(goldCost);
+    }
     switch (path) {
       case DevelopmentPath.Military:
         this._militaryLevel++;
@@ -2124,6 +2153,24 @@ export class PlayerImpl implements Player {
       case DevelopmentPath.Scientific:
         this._scientificLevel++;
         break;
+    }
+    if (tierDef) {
+      if (tierDef.immediateReservePercent > 0) {
+        const cap = this.mg.config().maxTroops(this);
+        const reserve = Math.min(
+          tierDef.immediateMaxTroops,
+          Math.floor((cap * tierDef.immediateReservePercent) / 100),
+        );
+        if (reserve > 0) {
+          this.addTroops(reserve);
+        }
+      }
+      if (tierDef.immediateStabilityBonus !== 0) {
+        this.setStability(this._stability + tierDef.immediateStabilityBonus);
+      }
+      if (tierDef.immediateCivilianBonus !== 0) {
+        this.addCivilianPopulation(tierDef.immediateCivilianBonus);
+      }
     }
     return true;
   }

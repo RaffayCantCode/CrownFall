@@ -819,6 +819,29 @@ const allyOpsMenuElement: MenuElement = {
     const enemy = findActiveEnemyForAllyRequest(params);
     return [
       {
+        id: "ally_req_troops_for_gold",
+        name: "buy troops",
+        disabled: () => params.myPlayer.gold() < 50_000n,
+        color: "#f59e0b",
+        icon: donateGoldIcon,
+        tooltipKeys: [
+          {
+            key: "crownfall.alliance.btn_troops_for_gold",
+            className: "text-amber-300",
+          },
+        ],
+        action: (p) => {
+          p.eventBus.emit(
+            new SendAllianceActionRequestIntentEvent(
+              ally.id(),
+              AllianceActionType.TroopsForGold,
+              null,
+            ),
+          );
+          p.closeMenu();
+        },
+      },
+      {
         id: "ally_req_reinforcements",
         name: "request troops",
         disabled: () => false,
@@ -835,6 +858,29 @@ const allyOpsMenuElement: MenuElement = {
             new SendAllianceActionRequestIntentEvent(
               ally.id(),
               AllianceActionType.Reinforcements,
+              null,
+            ),
+          );
+          p.closeMenu();
+        },
+      },
+      {
+        id: "ally_req_gold_aid",
+        name: "request gold",
+        disabled: () => false,
+        color: "#fbbf24",
+        icon: donateGoldIcon,
+        tooltipKeys: [
+          {
+            key: "crownfall.alliance.btn_gold_aid",
+            className: "text-amber-200",
+          },
+        ],
+        action: (p) => {
+          p.eventBus.emit(
+            new SendAllianceActionRequestIntentEvent(
+              ally.id(),
+              AllianceActionType.GoldAid,
               null,
             ),
           );

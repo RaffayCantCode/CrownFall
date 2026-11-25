@@ -10,6 +10,7 @@ import {
   GameMode,
   GameType,
   GameUpdates,
+  Gold,
   HumansVsNations,
   MessageType,
   Nation,
@@ -580,11 +581,22 @@ export class GameImpl implements Game {
     if (!requestor.isAlive() || !recipient.isAlive() || requestor === recipient) {
       return null;
     }
+    if (this._config.disableAlliances()) {
+      return null;
+    }
     if (!requestor.isFriendly(recipient)) {
       return null;
     }
     if (actionType === AllianceActionType.JointAttack) {
       if (target === null || !target.isAlive() || recipient.isFriendly(target)) {
+        return null;
+      }
+    } else if (actionType === AllianceActionType.TroopsForGold) {
+      if (requestor.gold() < CROWNFALL_ALLIANCE_CONFIG.troopsForGoldMinPayment) {
+        return null;
+      }
+    } else if (actionType === AllianceActionType.GoldForTroops) {
+      if (requestor.troops() < CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinTroops) {
         return null;
       }
     }
@@ -636,6 +648,13 @@ export class GameImpl implements Game {
     return id;
   }
 
+  pendingAllianceActionsFor(recipient: Player) {
+    if (this._pendingAllianceActions.length === 0) return [];
+    return this._pendingAllianceActions.filter(
+      (r) => r.recipientID === recipient.id() && r.expiresAt > this._ticks,
+    );
+  }
+
   replyAllianceActionRequest(
     recipient: Player,
     requestID: number,
@@ -658,6 +677,13 @@ export class GameImpl implements Game {
     }
 
     let executed = false;
+    let troopsAmount: number | undefined;
+    let goldAmount: Gold | undefined;
+    const targetSmallID =
+      req.targetID !== null && this.hasPlayer(req.targetID)
+        ? this.player(req.targetID).smallID()
+        : null;
+
     if (accept) {
       if (req.actionType === AllianceActionType.JointAttack) {
         if (req.targetID !== null && this.hasPlayer(req.targetID)) {
@@ -669,10 +695,33 @@ export class GameImpl implements Game {
                 100,
             );
             if (troops > 0) {
-              this.addExecution(
-                new AttackExecution(troops, recipient, target.id(), null),
-              );
-              executed = true;
+              if (recipient.sharesBorderWith(target)) {
+                this.addExecution(
+                  new AttackExecution(troops, recipient, target.id(), null),
+                );
+                recipient.target(target);
+                troopsAmount = troops;
+                executed = true;
+              } else {
+                const freeCap = Math.max(
+                  0,
+                  Math.floor(
+                    this.config().maxTroops(requestor) - requestor.troops(),
+                  ),
+                );
+                const toSend = Math.min(
+                  troops,
+                  CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
+                  freeCap,
+                );
+                if (toSend > 0) {
+                  recipient.removeTroops(toSend);
+                  requestor.addTroops(toSend);
+                  recipient.target(target);
+                  troopsAmount = toSend;
+                  executed = true;
+                }
+              }
             }
           }
         }
@@ -694,6 +743,7 @@ export class GameImpl implements Game {
         if (toSend > 0) {
           recipient.removeTroops(toSend);
           requestor.addTroops(toSend);
+          troopsAmount = toSend;
           executed = true;
         }
       } else if (req.actionType === AllianceActionType.DefenseAid) {
@@ -711,14 +761,20 @@ export class GameImpl implements Game {
           CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
           freeCap,
         );
+        let totalCommitted = 0;
         if (toSend > 0) {
           recipient.removeTroops(toSend);
           requestor.addTroops(toSend);
+          totalCommitted += toSend;
           executed = true;
         }
         if (req.targetID !== null && this.hasPlayer(req.targetID)) {
           const invader = this.player(req.targetID);
-          if (invader.isAlive() && !recipient.isFriendly(invader)) {
+          if (
+            invader.isAlive() &&
+            !recipient.isFriendly(invader) &&
+            recipient.sharesBorderWith(invader)
+          ) {
             const counterTroops = Math.floor(
               (recipient.troops() *
                 CROWNFALL_ALLIANCE_CONFIG.defenseAidCounterAttackPercent) /
@@ -733,9 +789,91 @@ export class GameImpl implements Game {
                   null,
                 ),
               );
+              totalCommitted += counterTroops;
               executed = true;
             }
           }
+        }
+        if (totalCommitted > 0) {
+          troopsAmount = totalCommitted;
+        }
+      } else if (req.actionType === AllianceActionType.TroopsForGold) {
+        const payment =
+          requestor.gold() >=
+          CROWNFALL_ALLIANCE_CONFIG.troopsForGoldStandardPayment
+            ? CROWNFALL_ALLIANCE_CONFIG.troopsForGoldStandardPayment
+            : requestor.gold() >=
+                CROWNFALL_ALLIANCE_CONFIG.troopsForGoldMinPayment
+              ? CROWNFALL_ALLIANCE_CONFIG.troopsForGoldMinPayment
+              : 0n;
+        const share = Math.floor(
+          (recipient.troops() *
+            CROWNFALL_ALLIANCE_CONFIG.troopsForGoldTroopPercent) /
+            100,
+        );
+        const freeCap = Math.max(
+          0,
+          Math.floor(this.config().maxTroops(requestor) - requestor.troops()),
+        );
+        const toSend = Math.min(
+          share,
+          CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
+          freeCap,
+        );
+        if (payment > 0n && toSend > 0) {
+          const paid = requestor.removeGold(payment);
+          recipient.addGold(paid);
+          recipient.removeTroops(toSend);
+          requestor.addTroops(toSend);
+          goldAmount = paid;
+          troopsAmount = toSend;
+          executed = true;
+        }
+      } else if (req.actionType === AllianceActionType.GoldForTroops) {
+        const payout =
+          recipient.gold() >=
+          CROWNFALL_ALLIANCE_CONFIG.goldForTroopsStandardPayout
+            ? CROWNFALL_ALLIANCE_CONFIG.goldForTroopsStandardPayout
+            : recipient.gold() >=
+                CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinPayout
+              ? CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinPayout
+              : 0n;
+        const share = Math.floor(
+          (requestor.troops() *
+            CROWNFALL_ALLIANCE_CONFIG.goldForTroopsSendPercent) /
+            100,
+        );
+        const allyFreeCap = Math.max(
+          0,
+          Math.floor(this.config().maxTroops(recipient) - recipient.troops()),
+        );
+        const toSend = Math.min(
+          share,
+          CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
+          allyFreeCap,
+        );
+        if (payout > 0n && toSend > 0) {
+          const paid = recipient.removeGold(payout);
+          requestor.addGold(paid);
+          requestor.removeTroops(toSend);
+          recipient.addTroops(toSend);
+          goldAmount = paid;
+          troopsAmount = toSend;
+          executed = true;
+        }
+      } else if (req.actionType === AllianceActionType.GoldAid) {
+        const rawShare =
+          (recipient.gold() * BigInt(CROWNFALL_ALLIANCE_CONFIG.goldAidPercent)) /
+          100n;
+        const toSend =
+          rawShare > CROWNFALL_ALLIANCE_CONFIG.maxGoldAid
+            ? CROWNFALL_ALLIANCE_CONFIG.maxGoldAid
+            : rawShare;
+        if (toSend >= CROWNFALL_ALLIANCE_CONFIG.minGoldAid) {
+          const sent = recipient.removeGold(toSend);
+          requestor.addGold(sent);
+          goldAmount = sent;
+          executed = true;
         }
       }
     }
@@ -747,6 +885,10 @@ export class GameImpl implements Game {
       recipientID: recipient.smallID(),
       actionType: req.actionType,
       accepted: accept && executed,
+      troopsAmount,
+      goldAmount,
+      targetID: targetSmallID,
+      reason: !accept ? "declined" : !executed ? "insufficient" : undefined,
     });
     return true;
   }
@@ -858,6 +1000,7 @@ export class GameImpl implements Game {
 
   triggerAugmentDraft(): boolean {
     if (
+      this._config.disableAugments() ||
       this._augmentDraftActive ||
       this._pathDraftActive ||
       this._augmentRoundsTriggered >= MAX_AUGMENTS_PER_PLAYER ||
@@ -1083,9 +1226,30 @@ export class GameImpl implements Game {
           this._ticks % 10 === 0 &&
           this._pendingAllianceActions.length > 0
         ) {
-          this._pendingAllianceActions = this._pendingAllianceActions.filter(
-            (r) => r.expiresAt > this._ticks,
-          );
+          const stillPending: typeof this._pendingAllianceActions = [];
+          for (const r of this._pendingAllianceActions) {
+            if (r.expiresAt > this._ticks) {
+              stillPending.push(r);
+            } else if (
+              this.hasPlayer(r.requestorID) &&
+              this.hasPlayer(r.recipientID)
+            ) {
+              this.addUpdate({
+                type: GameUpdateType.AllianceActionReply,
+                requestID: r.id,
+                requestorID: this.player(r.requestorID).smallID(),
+                recipientID: this.player(r.recipientID).smallID(),
+                actionType: r.actionType,
+                accepted: false,
+                targetID:
+                  r.targetID !== null && this.hasPlayer(r.targetID)
+                    ? this.player(r.targetID).smallID()
+                    : null,
+                reason: "expired",
+              });
+            }
+          }
+          this._pendingAllianceActions = stillPending;
         }
         if (
           !this._pathDraftTriggered &&
@@ -1097,6 +1261,7 @@ export class GameImpl implements Game {
         if (!this._pathDraftActive) {
           this._activeGameplayTicks++;
           if (
+            !this._config.disableAugments() &&
             this._augmentRoundsTriggered < AUGMENT_ROUND_TICKS.length &&
             this._activeGameplayTicks >=
               AUGMENT_ROUND_TICKS[this._augmentRoundsTriggered]

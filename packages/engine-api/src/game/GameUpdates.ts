@@ -196,6 +196,10 @@ export interface AllianceActionReplyUpdate {
   recipientID: number;
   actionType: AllianceActionType;
   accepted: boolean;
+  troopsAmount?: number;
+  goldAmount?: Gold;
+  targetID?: number | null;
+  reason?: "declined" | "insufficient" | "expired";
 }
 
 export interface AugmentDraftUpdate {

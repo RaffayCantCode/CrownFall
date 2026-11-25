@@ -237,6 +237,9 @@ export class PlayerExecution implements Execution {
   }
 
   private tickCrownfallCrises(ticks: number, stability: number): void {
+    if (this.config.disableRebellions()) {
+      return;
+    }
     // 1. Civilian emigration under Unrest / Crisis / Rebellion
     const currentPop = this.player.civilianPopulation();
     const emigrants = computeEmigrationPerSecond(currentPop, stability);

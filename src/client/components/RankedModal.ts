@@ -4,6 +4,7 @@ import { customElement, state } from "lit/decorators.js";
 import { responseHasLinkedIdentity } from "../AccountIdentity";
 import { getUserMe } from "../Api";
 import { userAuth } from "../Auth";
+import { getCurrentCrownfallAccount } from "./CrownfallAccountModal";
 import { gamePortal } from "../GamePortal";
 import type { MatchmakingMode } from "../Matchmaking";
 import { translateText } from "../Utils";
@@ -216,7 +217,10 @@ export class RankedModal extends BaseModal {
       this.showTrustRequired = true;
       return;
     }
-    if ((await userAuth()) === false) {
+    if (
+      getCurrentCrownfallAccount() === null &&
+      (await userAuth()) === false
+    ) {
       this.close();
       window.showPage?.("page-account");
       return;

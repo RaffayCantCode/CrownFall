@@ -43,6 +43,8 @@ declare global {
       // standalone deployments (beta, branch previews, dev), desktop, and
       // static pages.
       siteHost?: string;
+      // True on Cloudflare Pages serverless builds backed by Pages Functions + D1.
+      cloudflareMultiplayer?: boolean;
     };
   }
 }

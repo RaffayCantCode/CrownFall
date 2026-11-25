@@ -330,6 +330,9 @@ export const GameConfigSchema = z.object({
   instantBuild: z.boolean(),
   disableNavMesh: z.boolean().optional(),
   disableAlliances: z.boolean().nullable().optional(),
+  disablePaths: z.boolean().nullable().optional(),
+  disableAugments: z.boolean().nullable().optional(),
+  disableRebellions: z.boolean().nullable().optional(),
   disableClanTags: z.boolean().optional(),
   // Opt-in live game stats reporting for the admin bot. Off by default and has
   // no UI — the admin bot sets it when creating tournament games, since it adds

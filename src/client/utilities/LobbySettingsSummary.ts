@@ -16,6 +16,9 @@ export const LOBBY_SETTING_TAG =
 const DISABLED_UNIT_KEYS: Record<string, string> = {
   City: "unit_type.city",
   Port: "unit_type.port",
+  Housing: "unit_type.housing",
+  "Public Services": "unit_type.public_services",
+  "Research Centre": "unit_type.research_centre",
   "Defense Post": "unit_type.defense_post",
   "SAM Launcher": "unit_type.sam_launcher",
   "Missile Silo": "unit_type.missile_silo",
@@ -139,6 +142,26 @@ export function notableLobbySettings(
     items.push({
       label: translateText("overtime.title"),
       value: renderDuration((c.overtime.startMinutes ?? 30) * 60),
+    });
+  if (c.stableHegemony?.enabled === false)
+    items.push({
+      label: translateText("game_settings.stable_hegemony"),
+      value: disabled,
+    });
+  if (c.disablePaths)
+    items.push({
+      label: translateText("game_settings.crownfall_paths"),
+      value: disabled,
+    });
+  if (c.disableAugments)
+    items.push({
+      label: translateText("game_settings.crownfall_augments"),
+      value: disabled,
+    });
+  if (c.disableRebellions)
+    items.push({
+      label: translateText("game_settings.crownfall_rebellions"),
+      value: disabled,
     });
   if (c.anonymizeNames)
     items.push({

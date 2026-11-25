@@ -181,8 +181,17 @@ export class ClientEnv {
       // Absent on the web build (falls back to same-origin window.location).
       serverHost: bc.serverHost,
       siteHost: bc.siteHost,
+      cloudflareMultiplayer: bc.cloudflareMultiplayer === true,
     };
     return ClientEnv.values;
+  }
+
+  static isCloudflareMultiplayer(): boolean {
+    try {
+      return ClientEnv.get().cloudflareMultiplayer === true;
+    } catch {
+      return false;
+    }
   }
 
   // TODO: the following methods are duplicated on ServerEnv. The two classes
@@ -678,4 +687,5 @@ export interface ClientEnvValues {
   gitCommit: string;
   serverHost?: string;
   siteHost?: string;
+  cloudflareMultiplayer?: boolean;
 }

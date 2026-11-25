@@ -24,6 +24,7 @@ import { z } from "zod";
 import { getApiBase } from "./Api";
 import { getAuthHeader, getPersistentID } from "./Auth";
 import { LobbyConfig } from "./ClientGameRunner";
+import { recordCrownfallMapWin } from "./components/CrownfallAccountModal";
 import {
   GameSpeedDownIntentEvent,
   GameSpeedUpIntentEvent,
@@ -254,12 +255,38 @@ export class LocalServer {
       this.winner = clientMsg;
       this.allPlayersStats = clientMsg.allPlayersStats;
       if (!this.isReplay) {
+        this.maybeRecordMapAchievement(clientMsg.winner);
         // Archive as soon as the game is decided: endGame() only runs during
         // page teardown, where the auth refresh and upload race document
         // destruction and can silently lose the record (#4931).
         this.archiveGameRecord(false);
       }
     }
+  }
+
+  private maybeRecordMapAchievement(winner: ClientSendWinnerMessage["winner"]) {
+    if (this.lobbyConfig.snapshot !== undefined || !this.clientID) return;
+    const cfg = this.lobbyConfig.gameStartInfo?.config;
+    if (!cfg || cfg.tutorial) return;
+    // Standard singleplayer win check: player won with default cheat-free rules
+    const playerWon =
+      Array.isArray(winner) &&
+      ((winner[0] === "player" && winner[1] === this.clientID) ||
+        (winner[0] === "team" &&
+          Array.isArray(winner[2]) &&
+          winner[2].includes(this.clientID)));
+    if (!playerWon) return;
+    if (
+      cfg.infiniteGold ||
+      cfg.infiniteTroops ||
+      cfg.instantBuild ||
+      cfg.goldMultiplier !== undefined ||
+      cfg.startingGold !== undefined ||
+      (cfg.disabledUnits && cfg.disabledUnits.length > 0)
+    ) {
+      return;
+    }
+    void recordCrownfallMapWin(cfg.gameMap, cfg.difficulty);
   }
 
   // This is so the client can tell us when it finished processing the turn.
@@ -352,6 +379,13 @@ export class LocalServer {
     record: PartialGameRecord,
     unloading: boolean,
   ): Promise<void> {
+    if (
+      ClientEnv.isCloudflareMultiplayer?.() === true ||
+      getApiBase() === "https://api."
+    ) {
+      this.archived = true;
+      return;
+    }
     this.archiveInFlight = true;
     try {
       const authHeader = await getAuthHeader();

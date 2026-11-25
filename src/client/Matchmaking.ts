@@ -578,7 +578,80 @@ export class MatchmakingModal extends BaseModal {
     this.queueSize = null;
     this.reconnectAttempts = 0;
     this.notTrusted = false;
+    if (ClientEnv.isCloudflareMultiplayer?.() === true) {
+      void this.connectHttpMatchmaking();
+      return;
+    }
     void this.connect();
+  }
+
+  private async connectHttpMatchmaking(): Promise<void> {
+    const gen = this.checkGeneration;
+    this.connected = true;
+    this.requestUpdate();
+
+    const poll = async () => {
+      if (
+        !this.isModalOpen ||
+        this.intentionalClose ||
+        gen !== this.checkGeneration ||
+        this.gameID !== null
+      ) {
+        return;
+      }
+      try {
+        const token = await getPlayToken();
+        const res = await fetch("/api/mp/matchmaking", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: "poll",
+            mode: this.mode,
+            token,
+          }),
+        });
+        if (
+          !this.isModalOpen ||
+          this.intentionalClose ||
+          gen !== this.checkGeneration
+        ) {
+          return;
+        }
+        if (res.ok) {
+          const data = (await res.json()) as {
+            type?: string;
+            count?: number;
+            gameId?: string;
+          };
+          if (data.type === "queue-size" && typeof data.count === "number") {
+            this.queueSize = { count: data.count };
+          } else if (
+            data.type === "match-assignment" &&
+            typeof data.gameId === "string"
+          ) {
+            this.gameID = data.gameId;
+            this.gameCheckInterval = setInterval(() => this.checkGame(), 1000);
+            void this.checkGame();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("[Matchmaking] HTTP poll error:", err);
+      }
+      if (
+        this.isModalOpen &&
+        !this.intentionalClose &&
+        gen === this.checkGeneration &&
+        this.gameID === null
+      ) {
+        this.reconnectTimeout = setTimeout(() => void poll(), 1500);
+      }
+    };
+
+    void poll();
   }
 
   protected onClose(): void {
@@ -594,6 +667,22 @@ export class MatchmakingModal extends BaseModal {
     this.connected = false;
     this.intentionalClose = true;
     this.socket?.close();
+    if (ClientEnv.isCloudflareMultiplayer?.() === true) {
+      void getPlayToken()
+        .then((token) =>
+          fetch("/api/mp/matchmaking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "leave",
+              mode: this.mode,
+              token,
+            }),
+            keepalive: true,
+          }),
+        )
+        .catch(() => {});
+    }
     this.clearWatchdog();
     if (this.connectTimeout) {
       clearTimeout(this.connectTimeout);

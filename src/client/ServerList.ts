@@ -440,6 +440,7 @@ function fetchOnce(): Promise<ServerList | null> {
 export function startServerListPolling(): void {
   if (polling) return;
   try {
+    if (ClientEnv.isCloudflareMultiplayer?.() === true) return;
     if (safeSite() === undefined) return;
     if (isReplayShellHost(window.location.hostname)) return;
   } catch {
@@ -554,6 +555,9 @@ export function setServerListInGame(value: boolean): void {
  * still routes.
  */
 export async function ensureServerList(): Promise<ServerListStatus> {
+  if (ClientEnv.isCloudflareMultiplayer?.() === true) {
+    return "fallback";
+  }
   try {
     if (cached === null) {
       // Join the attempt in flight (the page-load one, usually); otherwise

@@ -38,6 +38,7 @@ import {
   purchaseCosmeticPack,
   purchaseWithCurrency,
 } from "./Api";
+import { ClientEnv } from "./ClientEnv";
 import { isDesktopShell } from "./DesktopShell";
 import { showInGameAlert, showInGameConfirm } from "./InGameModal";
 import {
@@ -1002,6 +1003,16 @@ function cosmeticsJsonUrl(): string {
 export async function fetchCosmetics(): Promise<Cosmetics | null> {
   if (__cosmetics !== null) {
     return __cosmetics;
+  }
+  if (
+    ClientEnv.isCloudflareMultiplayer?.() === true ||
+    getApiBase() === "https://api."
+  ) {
+    const emptyCatalog: Cosmetics = { patterns: {}, flags: {} };
+    __cosmeticsCache = emptyCatalog;
+    __cosmeticsFetchedAt = Date.now();
+    __cosmetics = Promise.resolve(emptyCatalog);
+    return emptyCatalog;
   }
   const request = (async () => {
     try {

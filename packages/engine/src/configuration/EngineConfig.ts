@@ -268,7 +268,15 @@ export class EngineConfig extends Config {
     }
     const distPenalty = citiesVisited * 5_000;
     const gold = Math.max(5000, baseGold - distPenalty);
-    return toInt(gold * this.goldMultiplierFor(player));
+    const tradeIncomePercent =
+      (
+        player as {
+          pathModifiers?: () => { tradeIncomePercent?: number };
+        }
+      ).pathModifiers?.()?.tradeIncomePercent ?? 100;
+    const scaledGold =
+      tradeIncomePercent === 100 ? gold : (gold * tradeIncomePercent) / 100;
+    return toInt(scaledGold * this.goldMultiplierFor(player));
   }
 
   trainStationMinRange(): number {
@@ -282,7 +290,17 @@ export class EngineConfig extends Config {
     // Sigmoid: concave start, sharp S-curve middle, linear end - heavily punishes trades under range debuff.
     const debuff = this.tradeShipShortRangeDebuff();
     const baseGold = 75_000 / (1 + exp(-0.03 * (dist - debuff))) + 50 * dist;
-    return BigInt(Math.floor(baseGold * this.goldMultiplierFor(player)));
+    const tradeIncomePercent =
+      (
+        player as {
+          pathModifiers?: () => { tradeIncomePercent?: number };
+        }
+      ).pathModifiers?.()?.tradeIncomePercent ?? 100;
+    const scaledBase =
+      tradeIncomePercent === 100
+        ? baseGold
+        : (baseGold * tradeIncomePercent) / 100;
+    return BigInt(Math.floor(scaledBase * this.goldMultiplierFor(player)));
   }
 
   /**
@@ -480,7 +498,12 @@ export class EngineConfig extends Config {
           Math.min(player.unitsOwned(type), player.unitsConstructed(type)),
         0,
       );
-      return BigInt(costFn(numUnits + extraUnits));
+      const rawCost = BigInt(costFn(numUnits + extraUnits));
+      const costPercent = player.pathModifiers().structureCostPercent;
+      if (costPercent === 100) {
+        return rawCost;
+      }
+      return (rawCost * BigInt(costPercent)) / 100n;
     };
   }
 

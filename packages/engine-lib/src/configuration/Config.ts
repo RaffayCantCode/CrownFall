@@ -207,6 +207,15 @@ export class Config {
       (this._gameConfig.disableAlliances ?? false)
     );
   }
+  disablePaths(): boolean {
+    return this._gameConfig.disablePaths ?? false;
+  }
+  disableAugments(): boolean {
+    return this._gameConfig.disableAugments ?? false;
+  }
+  disableRebellions(): boolean {
+    return this._gameConfig.disableRebellions ?? false;
+  }
   isRandomSpawn(): boolean {
     return this._gameConfig.randomSpawn;
   }
@@ -389,22 +398,40 @@ export class Config {
       return maxTroops / 3;
     }
 
+    const maxTroopsPercent =
+      (
+        player as {
+          pathModifiers?: () => { maxTroopsPercent?: number };
+        }
+      ).pathModifiers?.()?.maxTroopsPercent ?? 100;
+
     if (player.type() === PlayerType.Human) {
-      return maxTroops;
+      if (this.hasInfiniteTroopsFor(player) || maxTroopsPercent === 100) {
+        return maxTroops;
+      }
+      return Math.floor((maxTroops * maxTroopsPercent) / 100);
     }
 
+    let nationCap: number;
     switch (this._gameConfig.difficulty) {
       case Difficulty.Easy:
-        return maxTroops * 0.5;
+        nationCap = maxTroops * 0.5;
+        break;
       case Difficulty.Medium:
-        return maxTroops * 0.75;
+        nationCap = maxTroops * 0.75;
+        break;
       case Difficulty.Hard:
-        return maxTroops * 1; // Like humans
+        nationCap = maxTroops * 1; // Like humans
+        break;
       case Difficulty.Impossible:
-        return maxTroops * 1.25;
+        nationCap = maxTroops * 1.25;
+        break;
       default:
         assertNever(this._gameConfig.difficulty);
     }
+    return maxTroopsPercent === 100
+      ? nationCap
+      : Math.floor((nationCap * maxTroopsPercent) / 100);
   }
 
   troopIncreaseRate(player: PlayerLike): number {
@@ -485,6 +512,6 @@ export class Config {
 
   /** Whether the synchronized opening Path Draft triggers automatically after spawn phase. */
   enableOpeningPathDraft(): boolean {
-    return true;
+    return !this.disablePaths();
   }
 }

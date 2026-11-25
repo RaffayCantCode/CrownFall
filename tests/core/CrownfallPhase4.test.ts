@@ -1,14 +1,19 @@
 import {
   AllianceActionType,
+  Cell,
+  Difficulty,
   GameType,
+  Nation,
   PlayerInfo,
   PlayerType,
 } from "@openfront/engine-api/game/GameTypes";
+import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { IntentSchema } from "@openfront/engine-api/Schemas";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
 import { AllianceActionReplyExecution } from "@openfront/engine/execution/alliance/AllianceActionReplyExecution";
 import { AllianceActionRequestExecution } from "@openfront/engine/execution/alliance/AllianceActionRequestExecution";
 import { AllianceRequestExecution } from "@openfront/engine/execution/alliance/AllianceRequestExecution";
+import { NationExecution } from "@openfront/engine/execution/NationExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
 import { Game } from "@openfront/engine/game/Game";
 import { describe, expect, test } from "vitest";
@@ -199,5 +204,73 @@ describe("Crownfall Phase 4: Meaningful Alliances", () => {
     ).not.toBeNull();
 
     await expectSnapshotRoundTrip(game, "plains", 15);
+  });
+
+  test("TroopsForGold, GoldForTroops, GoldAid, and AI Nation auto-reply work with rich AllianceActionReply feedback", async () => {
+    const humanInfo = new PlayerInfo("Commander", PlayerType.Human, "c1", "p1");
+    const nationInfo = new PlayerInfo(
+      "IronRepublic",
+      PlayerType.Nation,
+      null,
+      "nation-1",
+    );
+    const game = await setup(
+      "plains",
+      {
+        gameType: GameType.Singleplayer,
+        difficulty: Difficulty.Easy,
+        instantBuild: true,
+        startingGold: 500_000,
+      },
+      [humanInfo],
+      undefined,
+      undefined,
+      false,
+    );
+    game.addExecution(
+      new SpawnExecution("test-game", humanInfo, game.ref(15, 20)),
+      new SpawnExecution("test-game", nationInfo, game.ref(35, 20)),
+      new NationExecution("test-game", new Nation(new Cell(35, 20), nationInfo)),
+    );
+    executeTicks(game, 5);
+    game.endSpawnPhase();
+    executeTicks(game, 15);
+
+    const human = game.player("p1");
+    const aiNation = game.player("nation-1");
+
+    // Form alliance with AI Nation
+    formAlliance(game, "p1", "nation-1");
+    human.setTroops(10_000);
+    aiNation.setTroops(60_000);
+
+    // Send TroopsForGold request to AI Nation — AI should evaluate and reply automatically within ~25 ticks!
+    const reqId = game.createAllianceActionRequest(
+      human,
+      aiNation,
+      AllianceActionType.TroopsForGold,
+      null,
+    );
+    expect(reqId).not.toBeNull();
+
+    let sawReply = false;
+    let replyAccepted = false;
+    for (let t = 0; t < 35; t++) {
+      const updates = game.executeNextTick();
+      const replies = updates[GameUpdateType.AllianceActionReply];
+      if (replies.length > 0) {
+        sawReply = true;
+        replyAccepted = replies[0].accepted;
+        if (replies[0].accepted) {
+          expect(replies[0].troopsAmount).toBeGreaterThan(0);
+          expect(replies[0].goldAmount).toBe(100_000n);
+        }
+        break;
+      }
+    }
+    expect(sawReply).toBe(true);
+    if (replyAccepted) {
+      expect(human.troops()).toBeGreaterThan(15_000);
+    }
   });
 });

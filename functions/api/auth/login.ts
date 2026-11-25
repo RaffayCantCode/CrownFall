@@ -3,14 +3,13 @@ import {
   jsonResponse,
   normalizeUsername,
   type PagesContext,
+  parseAchievementsJson,
   requireDb,
   verifyPassword,
 } from "../_auth";
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const dbOrError = requireDb(context.env);
-  if (dbOrError instanceof Response) return dbOrError;
-  const db = dbOrError;
+  const db = await requireDb(context.env);
 
   let body: { username?: unknown; password?: unknown };
   try {
@@ -26,7 +25,7 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 
   const row = await db
     .prepare(
-      "SELECT id, username, commander_name, password_hash FROM accounts WHERE username = ?",
+      "SELECT id, username, commander_name, password_hash, achievements_json FROM accounts WHERE username = ?",
     )
     .bind(username)
     .first<{
@@ -34,6 +33,7 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
       username: string;
       commander_name: string;
       password_hash: string;
+      achievements_json?: string;
     }>();
 
   if (!row || !(await verifyPassword(body.password, row.password_hash))) {
@@ -47,6 +47,7 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         id: row.id,
         username: row.username,
         commanderName: row.commander_name,
+        achievements: parseAchievementsJson(row.achievements_json),
       },
     },
     200,

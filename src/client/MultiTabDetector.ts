@@ -17,6 +17,14 @@ export class MultiTabDetector {
   }
 
   public startMonitoring(startPenalty: (duration: number) => void): void {
+    // Allow multi-tab local/serverless testing without 10s penalty lockouts
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+    ) {
+      return;
+    }
     this.startPenaltyCallback = startPenalty;
     this.writeLock();
     this.heartbeatTimer = window.setInterval(

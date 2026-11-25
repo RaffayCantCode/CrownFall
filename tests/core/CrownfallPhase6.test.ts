@@ -7,7 +7,11 @@ import {
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { IntentSchema } from "@openfront/engine-api/Schemas";
-import { NATIONAL_PROJECTS_BY_ID } from "@openfront/engine-lib/configuration/CrownfallProjects";
+import {
+  ALL_NATIONAL_PROJECTS,
+  NATIONAL_PROJECTS_BY_ID,
+  projectsForPath,
+} from "@openfront/engine-lib/configuration/CrownfallProjects";
 import { ActivateNationalProjectExecution } from "@openfront/engine/execution/ActivateNationalProjectExecution";
 import { NukeExecution } from "@openfront/engine/execution/NukeExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
@@ -217,5 +221,34 @@ describe("Crownfall Phase 6: Advanced Technologies & National Operations", () =>
     const rp1 = restored.player("p1");
     expect(rp1.activeProject()).toBe(p1.activeProject());
     expect(rp1.projectCooldownUntilTick()).toBe(p1.projectCooldownUntilTick());
+  });
+
+  test("12 unique Path-tied Operations (4 per Path across T1–T4) unlock progressively and grant distinct effects", async () => {
+    expect(ALL_NATIONAL_PROJECTS.length).toBe(12);
+    expect(projectsForPath(DevelopmentPath.Military).length).toBe(4);
+    expect(projectsForPath(DevelopmentPath.Political).length).toBe(4);
+    expect(projectsForPath(DevelopmentPath.Scientific).length).toBe(4);
+
+    const game = await createPhase6Game();
+    const p1 = game.player("p1");
+    const p2 = game.player("p2");
+
+    // Political T1 unlocks Sovereign War Bonds (+125K immediate Gold!)
+    p1.setPrimaryPath(DevelopmentPath.Political);
+    p1.addScience(500);
+    expect(p1.unlockDevTier(DevelopmentPath.Political)).toBe(true);
+    const goldBefore = p1.gold();
+    expect(p1.activateNationalProject(NationalProject.WarBonds)).toBe(true);
+    expect(p1.gold()).toBe(goldBefore + 125_000n);
+
+    // Scientific T1 unlocks Accelerated R&D Symposium (spends 75K Gold -> +160 immediate Science!)
+    p2.setPrimaryPath(DevelopmentPath.Scientific);
+    p2.addScience(200);
+    expect(p2.unlockDevTier(DevelopmentPath.Scientific)).toBe(true);
+    const sciBefore = p2.science();
+    expect(p2.activateNationalProject(NationalProject.ResearchGrant)).toBe(
+      true,
+    );
+    expect(p2.science()).toBe(sciBefore + 160);
   });
 });

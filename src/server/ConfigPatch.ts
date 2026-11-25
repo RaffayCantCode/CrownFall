@@ -30,6 +30,7 @@ const COPIED_KEYS = [
   "trusted",
   "doomsdayClock",
   "overtime",
+  "stableHegemony",
   "anonymizeNames",
   "nameReveals",
   "nameRevealPublicIds",
@@ -45,6 +46,9 @@ const NULLABLE_KEYS = [
   "goldMultiplier",
   "startingGold",
   "disableAlliances",
+  "disablePaths",
+  "disableAugments",
+  "disableRebellions",
   "customAllianceDuration",
   "waterNukes",
 ] as const satisfies readonly (keyof GameConfig)[];

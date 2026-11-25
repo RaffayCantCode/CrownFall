@@ -7,9 +7,7 @@ import {
 } from "../_auth";
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const dbOrError = requireDb(context.env);
-  if (dbOrError instanceof Response) return dbOrError;
-  const db = dbOrError;
+  const db = await requireDb(context.env);
 
   const account = await getAuthenticatedAccount(db, context.request);
   if (!account) {

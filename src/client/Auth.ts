@@ -533,6 +533,14 @@ async function doRefreshJwt(): Promise<void> {
       return doPortalLogin(portal, token);
     }
   }
+  if (
+    !getAudience() ||
+    ClientEnv.isCloudflareMultiplayer?.() === true ||
+    getApiBase() === "https://api."
+  ) {
+    __jwt = null;
+    return;
+  }
   try {
     console.log("Refreshing jwt");
     // Bounded like doSteamLogin below: userAuth() awaits this, and every
@@ -796,10 +804,28 @@ export async function sendMagicLink(email: string): Promise<boolean> {
 }
 
 // WARNING: DO NOT EXPOSE THIS ID
+const TAB_PLAY_ID_KEY = "crownfall_tab_play_id";
+
 export async function getPlayToken(): Promise<string> {
-  const result = await userAuth();
-  if (result !== false) return result.jwt;
-  return getPersistentIDFromLocalStorage();
+  if (ClientEnv.isCloudflareMultiplayer?.() !== true) {
+    const result = await userAuth();
+    if (result !== false) return result.jwt;
+  }
+  // Ensure base localStorage persistent ID exists
+  const baseId = getPersistentIDFromLocalStorage();
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      let tabId = sessionStorage.getItem(TAB_PLAY_ID_KEY);
+      if (!tabId) {
+        tabId = generateCryptoRandomUUID();
+        sessionStorage.setItem(TAB_PLAY_ID_KEY, tabId);
+      }
+      return tabId;
+    }
+  } catch {
+    // Fall back to localStorage ID if sessionStorage is restricted
+  }
+  return baseId;
 }
 
 // WARNING: DO NOT EXPOSE THIS ID

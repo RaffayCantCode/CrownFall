@@ -19,6 +19,10 @@ import {
   coordinatorUrl,
   LobbyCoordinatorClient,
 } from "./LobbyCoordinatorClient";
+import {
+  registerLocalCrownfallRoutes,
+  startDevStubApiIfNeeded,
+} from "./LocalCrownfallRoutes";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 import { fetchMapWeights, MAP_WEIGHTS_POLL_MS } from "./MapWeights";
@@ -151,6 +155,7 @@ app.use("/api", (_req, res, next) => {
   setNoStoreHeaders(res);
   next();
 });
+registerLocalCrownfallRoutes(app);
 
 // Start the master process
 export async function startMaster() {
@@ -287,6 +292,7 @@ export async function startMaster() {
   server.listen(PORT, () => {
     log.info(`Master HTTP server listening on port ${PORT}`);
   });
+  startDevStubApiIfNeeded();
 
   // Register with the API and keep checking in (docs/MultiServer.md,
   // "Server list v2"): the API's list is what clients read to find a

@@ -1403,6 +1403,9 @@
   "game_settings": {
     "bots": "Tribes: ",
     "compact_map": "Compact Map",
+    "crownfall_augments": "National Choices (Augments)",
+    "crownfall_paths": "Development Paths & Operations",
+    "crownfall_rebellions": "Stability Crises & Rebellions",
     "custom_alliances": "Alliance Duration",
     "disable_units": "Disable Units",
     "doomsday_clock": "Doomsday Clock",
@@ -1416,6 +1419,7 @@
     "options": "Options",
     "overtime": "Overtime after (minutes)",
     "random_spawn": "Random spawn",
+    "stable_hegemony": "Stable Hegemony Victory",
     "start": "Start Game",
     "starting": "Starting…",
     "starting_gold": "Starting Gold (Millions)",
@@ -1910,95 +1914,141 @@
     "tax_high": "High",
     "paths_button": "Paths",
     "paths_title": "National Development Paths",
-    "paths_choose_primary": "Choose Primary Focus (-20% Cost, Tier 4 Unlock)",
+    "paths_choose_primary": "Primary Focus: -20% SCI & Gold Cost + Tier 4 Breakthrough",
     "paths_primary_badge": "Primary",
     "paths_set_primary": "Set Primary",
     "paths_unlock": "Unlock",
+    "paths_unlocked_toast": "{path} Path Tier {tier} unlocked! Immediate national bonuses & new Operation ready.",
     "paths_maxed": "Path Mastered",
     "paths_secondary_cap": "Secondary Cap Reached (T2)",
+    "hud": {
+      "buildings_title": "Civic & Economic Infrastructure",
+      "buildings_subtitle": "Select an infrastructure building, then click your territory to construct",
+      "arsenal_title": "Military & Strategic Arsenal",
+      "arsenal_subtitle": "Select a fortification, fleet, or strategic warhead to deploy",
+      "needs_port": "Requires Port",
+      "needs_silo": "Requires Missile Silo",
+      "role_city": "+250K Max Army Cap",
+      "role_factory": "Railroads & Train Gold",
+      "role_port": "Naval Access & Trade Ships",
+      "role_housing": "+150K Civilian Capacity",
+      "role_public_services": "+6 National Stability",
+      "role_research_centre": "+12 Science / sec",
+      "role_defense_post": "Fortifies Nearby Borders",
+      "role_missile_silo": "Launches Strategic Nukes",
+      "role_sam_launcher": "Intercepts Enemy Missiles",
+      "role_warship": "Patrols Seas & Raids Trade",
+      "role_atom_bomb": "Tactical Nuclear Strike",
+      "role_hydrogen_bomb": "Heavy Strategic Detonation",
+      "role_mirv": "Multi-Warhead Saturation Strike"
+    },
     "path": {
       "military": {
         "name": "Military",
         "t1": {
           "name": "Rapid Mobilisation",
-          "pro": "+12% troop regen, +6% attack speed",
-          "con": "-6 stability, -8% Science gen"
+          "pro": "+18% regen, +10% army cap, +8% attack speed + instant 8% veteran troops",
+          "con": "-5 stability, -6% Science gen"
         },
         "t2": {
           "name": "Shock Doctrine",
-          "pro": "-10% attack loss, +14% attack speed",
-          "con": "-10 stability, -8% tax, +15% overexpansion"
+          "pro": "+25% regen, +20% army cap, -14% losses, +16% speed, -10% build cost + 10% troops",
+          "con": "-8 stability, -6% tax, +12% overexpansion"
         },
         "t3": {
           "name": "Ballistic Supremacy",
-          "pro": "-18% loss, -15% Silo CD, +18% missile speed",
-          "con": "-15 stability, -14% Science, -13% tax"
+          "pro": "+32% army cap, -22% losses, -15% Silo CD, +18% missile speed, -15% build cost + 12% troops",
+          "con": "-12 stability, -10% Science, -10% tax"
         },
         "t4": {
           "name": "Total War Economy",
-          "pro": "+24% regen, -24% loss, +22% speed, -25% Silo CD, +28% missile speed",
-          "con": "-20 stability, +35% overexpansion, -18% tax, -20% Science"
+          "pro": "+40% regen, +45% army cap, -30% losses, +28% speed, -25% Silo CD, -20% build cost + 15% troops",
+          "con": "-15 stability, +25% overexpansion, -12% tax, -14% Science"
         }
       },
       "political": {
         "name": "Political",
         "t1": {
           "name": "Civil Administration",
-          "pro": "+10 stability, -20% overexpansion, +15% tax",
+          "pro": "+12 stability, -25% overexpansion, +20% tax, +15% trade gold + 10K civilians",
           "con": "-4% attack speed"
         },
         "t2": {
           "name": "Sovereign Treasury",
-          "pro": "+30% tax, +20% civ growth, -12% enemy border speed",
-          "con": "-8% attack speed, +4% attack loss"
+          "pro": "+40% tax, +30% trade gold, +25% civ growth, -15% invader speed, -12% build cost + 20K civilians",
+          "con": "-6% attack speed, +4% attack loss"
         },
         "t3": {
           "name": "Imperial Bastion",
-          "pro": "+18 stability, -45% overexpansion, -22% invader speed, +10% regen",
-          "con": "+6% attack loss, -8% Science gen"
+          "pro": "+20 stability, -50% overexpansion, -25% invader speed, +15% army cap & regen, -18% build cost",
+          "con": "+5% attack loss, -6% Science gen"
         },
         "t4": {
           "name": "Pax Imperia",
-          "pro": "+24 stability, -65% overexpansion, +45% tax, +40% civ growth, -28% invader speed",
-          "con": "-12% attack speed, -12% Science gen"
+          "pro": "+28 stability, +65% tax, +50% trade gold, -32% invader speed, +25% army cap, -25% build cost",
+          "con": "-8% attack speed, -8% Science gen"
         }
       },
       "scientific": {
         "name": "Scientific",
         "t1": {
           "name": "Applied Research",
-          "pro": "+35% Science gen, -8% invader speed",
-          "con": "-6% troop regen, -5% tax"
+          "pro": "+40% Science gen, -10% invader speed, -8% build cost + instant +6 stability",
+          "con": "-5% troop regen, -4% tax"
         },
         "t2": {
           "name": "Sky Shield & Precision",
-          "pro": "+25% SAM range, -20% SAM reload, -8% attack loss",
-          "con": "-8% troop regen, -10% tax"
+          "pro": "+30% SAM range, -25% SAM CD, -12% attack loss, -12% build cost, +10% trade gold",
+          "con": "-6% troop regen, -6% tax"
         },
         "t3": {
           "name": "Quantum Warheads & Drones",
-          "pro": "+60% Science, -20% invader speed, +14% blast, -12% Silo CD, +8% regen",
-          "con": "-4 stability, -6% attack speed"
+          "pro": "+75% Science, -22% invader speed, +14% blast, -12% Silo CD, +15% army cap, -18% build cost",
+          "con": "-4 stability, -4% attack speed"
         },
         "t4": {
           "name": "Orbital EW & Singularity",
-          "pro": "+90% Science, +50% SAM, -40% SAM CD, -30% enemy nukes, +22% blast, -14% loss",
-          "con": "-8 stability, -16% tax"
+          "pro": "+110% Science, +55% SAM, -45% SAM CD, -30% enemy nukes, +22% blast, -20% loss, +25% army cap",
+          "con": "-6 stability, -10% tax"
         }
       }
     },
     "ops_button": "Ops",
-    "ops_title": "National Operations (20s Duration • 60s Cooldown)",
+    "ops_title": "National Operations",
     "ops_locked": "Requires {path} Tier {tier}",
     "ops_active": "Active ({sec}s)",
     "ops_cooldown": "Cooldown ({sec}s)",
     "ops_activate": "Activate",
     "project": {
+      "frontline_conscription": {
+        "name": "Frontline Conscription",
+        "pro": "Instant +10% reserve troops (up to 80K), +25% troop regen, +10% attack speed",
+        "con": "-5 immediate stability from draft levies",
+        "activated": "Frontline Conscription enacted! Fresh conscript divisions reporting for duty."
+      },
       "surge_mobilisation": {
         "name": "Surge Mobilisation",
-        "pro": "Instant +15% reserve troops (up to 150k), +20% attack speed, -15% losses",
+        "pro": "Instant +15% reserve troops (up to 150K), +20% attack speed, -15% losses",
         "con": "-8 immediate stability (war exhaustion)",
         "activated": "Surge Mobilisation enacted! Reserve divisions deployed to the front."
+      },
+      "armored_spearhead": {
+        "name": "Armored Spearhead",
+        "pro": "+35% attack push speed, -30% combat losses, -20% arsenal & build cost",
+        "con": "-15% civilian tax while active & -6 stability",
+        "activated": "Armored Spearhead launched! Mechanized columns breaking enemy lines."
+      },
+      "defcon_barrage": {
+        "name": "DEFCON Strategic Barrage",
+        "pro": "Instant +20% elite troops (up to 250K), -50% Silo reload, +40% missile speed, +20% blast",
+        "con": "-12 immediate stability from full war footing",
+        "activated": "DEFCON Strategic Barrage authorized! All missile silos at rapid-fire readiness."
+      },
+      "war_bonds": {
+        "name": "Sovereign War Bonds",
+        "pro": "Instant +125K Gold treasury bond, +35% civilian tax & +25% trade gold",
+        "con": "-5 immediate stability from war bond austerity",
+        "activated": "Sovereign War Bonds issued! +125K Gold injected into the national treasury."
       },
       "national_reconciliation": {
         "name": "National Reconciliation",
@@ -2006,11 +2056,41 @@
         "con": "-15% attack push speed while active",
         "activated": "National Reconciliation enacted! Civic order and public confidence restored."
       },
+      "sovereign_bastion": {
+        "name": "Homeland Bastion Decree",
+        "pro": "Instant +12% militia, -35% enemy invasion speed, +25% army cap, -25% build cost",
+        "con": "-18% offensive attack speed while active",
+        "activated": "Homeland Bastion Decree active! Borders fortified with citizen militias."
+      },
+      "imperial_golden_age": {
+        "name": "Imperial Golden Age",
+        "pro": "Instant +300K Gold, +40K Civilians, +20 stability, +60% tax & +50% trade gold",
+        "con": "-10% offensive attack speed during festivities",
+        "activated": "Imperial Golden Age proclaimed! Unprecedented prosperity sweeps the empire."
+      },
+      "research_grant": {
+        "name": "Accelerated R&D Symposium",
+        "pro": "Instant +160 Science breakthrough & +65% Science generation while active",
+        "con": "-15% civilian tax revenue diverted to laboratories",
+        "activated": "Accelerated R&D Symposium funded! +160 Science added to national reserves."
+      },
       "emp_overdrive": {
         "name": "EMP & Radar Overdrive",
         "pro": "+40% SAM range, -50% SAM reload, -30% enemy border speed, -25% incoming missile speed",
         "con": "-5 immediate stability from national grid strain",
         "activated": "EMP & Radar Overdrive active! Enemy electronics and missiles jammed."
+      },
+      "drone_foundry": {
+        "name": "Autonomous Drone Foundry",
+        "pro": "Instant +10% drone reserves, -35% structure & arsenal cost, +40% regen, +35% trade",
+        "con": "-6 immediate stability from industrial automation",
+        "activated": "Autonomous Drone Foundry online! Construction costs slashed by 35%."
+      },
+      "orbital_aegis": {
+        "name": "Orbital Aegis & Quantum Strike",
+        "pro": "+75% SAM range, -65% SAM reload, -45% enemy nuke speed, +30% blast, -35% Silo CD",
+        "con": "-8 immediate stability from orbital power draw",
+        "activated": "Orbital Aegis & Quantum Strike engaged! Total aerospace supremacy established."
       }
     },
     "path_draft_badge": "Opening Mandate • Choose Your Destiny",
@@ -2109,15 +2189,38 @@
       }
     },
     "alliance": {
-      "ops_menu": "Allied Operations",
+      "ops_menu": "Allied Operations & Trades",
+      "btn_troops_for_gold": "Buy Allied Troops (Pay 50K–100K Gold for 25% troops)",
       "btn_reinforcements": "Request Reinforcements (20% troops)",
+      "btn_gold_aid": "Request Gold Subsidy (20% gold)",
       "btn_defense_aid": "Request Defensive Aid",
       "btn_joint_attack": "Request Joint Attack on Enemy",
       "btn_joint_attack_no_enemy": "Joint Attack (no active enemy)",
+      "label_troops_for_gold": "Troops-for-Gold Deal",
+      "label_gold_for_troops": "Mercenary Troops-for-Gold Offer",
+      "label_gold_aid": "Emergency Gold Subsidy",
+      "label_reinforcements": "Military Reinforcements",
+      "label_defense_aid": "Defensive Aid",
+      "label_joint_attack": "Joint Attack",
+      "action_sent": "Sent {action} request to {name} — awaiting response…",
       "req_joint_attack": "{name} requests a joint attack against {target}!",
       "req_reinforcements": "{name} requests military reinforcements!",
       "req_defense_aid": "{name} requests defensive assistance!",
       "req_defense_aid_target": "{name} is under attack by {target} and requests defensive aid!",
+      "req_troops_for_gold": "{name} offers Gold to purchase 25% of your troops!",
+      "req_gold_for_troops": "{name} offers 20% of their troops in exchange for your Gold!",
+      "req_gold_aid": "{name} requests an emergency Gold subsidy!",
+      "reply_accept_troops_for_gold": "{name} accepted your Troops-for-Gold deal! (+{troops} troops for {gold} gold)",
+      "reply_accept_gold_for_troops": "{name} bought your mercenary corps! (+{gold} gold for {troops} troops)",
+      "reply_accept_gold_aid": "{name} sent {gold} Gold in emergency allied aid!",
+      "reply_accept_reinforcements": "{name} sent {troops} allied reinforcement troops!",
+      "reply_accept_defense_aid": "{name} mobilized {troops} troops for your defense!",
+      "reply_accept_joint_attack": "{name} launched a joint strike ({troops} troops) on {target}!",
+      "reply_declined": "{name} declined your {action}.",
+      "reply_insufficient": "{name} accepted {action}, but lacked available reserves/capacity.",
+      "reply_expired": "{name} did not answer your {action} in time.",
+      "log_pact_accepted": "{name} accepted your diplomatic alliance!",
+      "log_pact_rejected": "{name} rejected your alliance proposal.",
       "accept": "Accept",
       "decline": "Decline"
     }

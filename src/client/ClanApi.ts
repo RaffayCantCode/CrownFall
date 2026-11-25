@@ -34,6 +34,7 @@ import {
 } from "@openfront/shared/ClanApiSchemas";
 import { getApiBase, getUserMe } from "./Api";
 import { getAuthHeader } from "./Auth";
+import { ClientEnv } from "./ClientEnv";
 
 const CLAN_EXISTS_FETCH_TIMEOUT_MS = 3000;
 export type {
@@ -225,6 +226,12 @@ export async function fetchClanDetail(tag: string): Promise<ClanInfo | false> {
 // unexpected status); the caller decides how to handle it. The tag is
 // uppercased to the canonical form so it matches the server's route.
 export async function fetchClanExists(tag: string): Promise<boolean | null> {
+  if (
+    ClientEnv.isCloudflareMultiplayer?.() === true ||
+    getApiBase() === "https://api."
+  ) {
+    return null;
+  }
   try {
     const path = `/public/clan/${encodeURIComponent(tag.toUpperCase())}/exists`;
     const res = await fetch(`${getApiBase()}${path}`, {

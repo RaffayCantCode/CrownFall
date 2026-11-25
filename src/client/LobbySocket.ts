@@ -45,6 +45,7 @@ export class PublicLobbySocket {
   private gaveUp = false;
   private workerPath: string = "";
   private stopped = true;
+  private httpPollTimer: number | null = null;
   // Bumped by start() and stop(). A continuation that awaited the server
   // list under an older value belongs to a run that has been replaced,
   // and must neither dial nor prompt on its behalf.
@@ -88,7 +89,48 @@ export class PublicLobbySocket {
     this.gaveUp = false;
     // A start() over a pending slow retry must dial now, not join its wait.
     this.disconnectWebSocket();
+    if (ClientEnv.isCloudflareMultiplayer?.() === true) {
+      void this.pollHttpLobbies(this.generation);
+      return;
+    }
     await this.discoverAndConnect(options?.refreshList);
+  }
+
+  private async pollHttpLobbies(generation: number): Promise<void> {
+    if (this.stopped || generation !== this.generation) return;
+    try {
+      const res = await fetch("/api/mp/lobbies", {
+        headers: { Accept: "application/json" },
+      });
+      if (this.stopped || generation !== this.generation) return;
+      if (res.ok) {
+        const data = (await res.json()) as PublicGames;
+        this.wsConnectionAttempts = 0;
+        this.gaveUp = false;
+        this.lastFull = data;
+        this.onLobbiesUpdate(data);
+      } else {
+        this.wsConnectionAttempts++;
+        if (this.wsConnectionAttempts >= this.maxWsAttempts) {
+          this.giveUp();
+        }
+      }
+    } catch {
+      if (this.stopped || generation !== this.generation) return;
+      this.wsConnectionAttempts++;
+      if (this.wsConnectionAttempts >= this.maxWsAttempts) {
+        this.giveUp();
+      }
+    }
+    if (!this.stopped && generation === this.generation) {
+      this.httpPollTimer = window.setTimeout(
+        () => {
+          this.httpPollTimer = null;
+          void this.pollHttpLobbies(generation);
+        },
+        this.gaveUp ? 8_000 : 1_800,
+      );
+    }
   }
 
   /**
@@ -212,6 +254,10 @@ export class PublicLobbySocket {
     if (this.wsReconnectTimeout !== null) {
       clearTimeout(this.wsReconnectTimeout);
       this.wsReconnectTimeout = null;
+    }
+    if (this.httpPollTimer !== null) {
+      clearTimeout(this.httpPollTimer);
+      this.httpPollTimer = null;
     }
   }
 
@@ -400,6 +446,10 @@ export class PublicLobbySocket {
     if (this.wsReconnectTimeout !== null) {
       clearTimeout(this.wsReconnectTimeout);
       this.wsReconnectTimeout = null;
+    }
+    if (this.httpPollTimer !== null) {
+      clearTimeout(this.httpPollTimer);
+      this.httpPollTimer = null;
     }
   }
 }

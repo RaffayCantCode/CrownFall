@@ -1,4 +1,7 @@
-import { DevelopmentPath } from "@openfront/engine-api/game/GameTypes";
+import {
+  DevelopmentPath,
+  MessageType,
+} from "@openfront/engine-api/game/GameTypes";
 import { zPlayerRef } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { z } from "zod";
 import { Execution, Game, Player } from "../game/Game";
@@ -11,17 +14,32 @@ import type {
 
 export class UnlockDevTierExecution implements Execution {
   private active = true;
+  private mg: Game;
 
   constructor(
     private player: Player,
     private path: DevelopmentPath,
   ) {}
 
-  init(_mg: Game, _ticks: number): void {}
+  init(mg: Game, _ticks: number): void {
+    this.mg = mg;
+  }
 
   tick(_ticks: number): void {
     if (this.player.isAlive()) {
-      this.player.unlockDevTier(this.path);
+      const ok = this.player.unlockDevTier(this.path);
+      if (ok && this.mg) {
+        this.mg.displayMessage(
+          "crownfall.paths_unlocked_toast",
+          MessageType.ALLIANCE_ACCEPTED,
+          this.player.id(),
+          undefined,
+          {
+            path: this.path.charAt(0).toUpperCase() + this.path.slice(1),
+            tier: this.player.devLevel(this.path),
+          },
+        );
+      }
     }
     this.active = false;
   }
@@ -44,6 +62,7 @@ export class UnlockDevTierExecution implements Execution {
 
   restoreSnapshot(s: UnlockDevTierState, r: SnapshotReader): void {
     this.active = s.active;
+    this.mg = r.game;
     this.player = r.player(s.player);
     this.path = s.path;
   }

@@ -188,12 +188,10 @@ export function joinLobby(
     console.log(`Joining game lobby ${lobbyConfig.gameID}`);
     void transport.joinGame();
   };
-  // Only begin a terrain preload once the same map has been stable across
-  // this many consecutive lobby_info broadcasts (one per second). A host
-  // clicking through map selections changes the config every broadcast, so
-  // debouncing avoids downloading (and permanently caching) a map that was
-  // only shown transiently.
-  const MAP_PRELOAD_DEBOUNCE_STREAK = 3;
+  // Begin a terrain preload as soon as a map is seen in lobby_info so both
+  // singleplayer and multiplayer lobbies warm the terrain + worker map caches
+  // immediately instead of stalling at game start.
+  const MAP_PRELOAD_DEBOUNCE_STREAK = 1;
   // In-flight terrain loads keyed by `map:mapSize`, so re-requesting a map
   // that began loading earlier (even after another map superseded it) reuses
   // the original promise instead of starting a duplicate download/parse while

@@ -225,12 +225,15 @@ export function applyAugmentModifiers(
   if (augments.length === 0) return base;
   let {
     troopRegenPercent,
+    maxTroopsPercent,
     attackerLossPercent,
     attackSpeedPercent,
     defenderSlowPercent,
     stabilityTargetDelta,
     overexpansionStrainPercent,
     civilianTaxPercent,
+    tradeIncomePercent,
+    structureCostPercent,
     civilianGrowthPercent,
     scienceRatePercent,
     samRangePercent,
@@ -244,6 +247,7 @@ export function applyAugmentModifiers(
   for (const id of augments) {
     const d = getAugmentDefinition(id).deltas;
     if (d.troopRegenPercent) troopRegenPercent += d.troopRegenPercent;
+    if (d.maxTroopsPercent) maxTroopsPercent += d.maxTroopsPercent;
     if (d.attackerLossPercent) attackerLossPercent += d.attackerLossPercent;
     if (d.attackSpeedPercent) attackSpeedPercent += d.attackSpeedPercent;
     if (d.defenderSlowPercent) defenderSlowPercent += d.defenderSlowPercent;
@@ -251,6 +255,8 @@ export function applyAugmentModifiers(
     if (d.overexpansionStrainPercent)
       overexpansionStrainPercent += d.overexpansionStrainPercent;
     if (d.civilianTaxPercent) civilianTaxPercent += d.civilianTaxPercent;
+    if (d.tradeIncomePercent) tradeIncomePercent += d.tradeIncomePercent;
+    if (d.structureCostPercent) structureCostPercent += d.structureCostPercent;
     if (d.civilianGrowthPercent)
       civilianGrowthPercent += d.civilianGrowthPercent;
     if (d.scienceRatePercent) scienceRatePercent += d.scienceRatePercent;
@@ -266,12 +272,15 @@ export function applyAugmentModifiers(
 
   return {
     troopRegenPercent: Math.max(40, troopRegenPercent),
+    maxTroopsPercent: Math.max(60, maxTroopsPercent),
     attackerLossPercent: Math.max(40, attackerLossPercent),
     attackSpeedPercent: Math.max(40, attackSpeedPercent),
     defenderSlowPercent: Math.max(40, defenderSlowPercent),
     stabilityTargetDelta,
     overexpansionStrainPercent: Math.max(15, overexpansionStrainPercent),
     civilianTaxPercent: Math.max(40, civilianTaxPercent),
+    tradeIncomePercent: Math.max(40, tradeIncomePercent),
+    structureCostPercent: Math.max(40, structureCostPercent),
     civilianGrowthPercent: Math.max(40, civilianGrowthPercent),
     scienceRatePercent: Math.max(40, scienceRatePercent),
     samRangePercent: Math.max(100, samRangePercent),

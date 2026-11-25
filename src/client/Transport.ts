@@ -63,6 +63,7 @@ import {
   SendUpdateGameConfigIntentEvent,
 } from "./LobbyEvents";
 import { LocalServer } from "./LocalServer";
+import { HttpMultiplayerTransport } from "./HttpMultiplayerTransport";
 import { describeSocketClose } from "./SocketClose";
 import { TURNSTILE_CANCELLED_CODE, TurnstileError } from "./TurnstileToken";
 import { homeHref, translateText } from "./Utils";
@@ -305,6 +306,7 @@ export class Transport {
   private socket: WebSocket | null = null;
 
   private localServer: LocalServer;
+  private httpTransport: HttpMultiplayerTransport | null = null;
 
   private buffer: ClientMessage[] = [];
 
@@ -487,6 +489,9 @@ export class Transport {
   ) {
     if (this.isLocal) {
       this.connectLocal(onconnect, onmessage);
+    } else if (ClientEnv.isCloudflareMultiplayer?.() === true) {
+      this.httpTransport ??= new HttpMultiplayerTransport(this.lobbyConfig);
+      this.httpTransport.start(onconnect, onmessage);
     } else {
       this.connectRemote(onconnect, onmessage);
     }
@@ -498,6 +503,8 @@ export class Transport {
   ) {
     if (this.isLocal) {
       this.localServer.updateCallback(onconnect, onmessage);
+    } else if (this.httpTransport !== null) {
+      this.httpTransport.updateCallback(onconnect, onmessage);
     } else {
       this.onconnect = onconnect;
       this.onmessage = onmessage;
@@ -815,6 +822,9 @@ export class Transport {
       this.connect(this.onconnect, this.onmessage);
       return;
     }
+    if (this.httpTransport !== null) {
+      return;
+    }
     this.scheduleReconnect();
   }
 
@@ -919,6 +929,11 @@ export class Transport {
     }
     if (this.isLocal) {
       this.localServer.endGame();
+      return;
+    }
+    if (this.httpTransport !== null) {
+      this.httpTransport.stop();
+      this.httpTransport = null;
       return;
     }
     // A left game is never rejoined through this transport, whatever still
@@ -1140,7 +1155,11 @@ export class Transport {
   }
 
   private onSendWinnerEvent(event: SendWinnerEvent) {
-    if (this.isLocal || this.socket?.readyState === WebSocket.OPEN) {
+    if (
+      this.isLocal ||
+      this.httpTransport !== null ||
+      this.socket?.readyState === WebSocket.OPEN
+    ) {
       this.sendMsg({
         type: "winner",
         winner: event.winner,
@@ -1287,6 +1306,9 @@ export class Transport {
     if (this.isLocal) {
       // Route to the in-process server; nothing goes over the wire.
       this.localServer.onMessage(msg);
+      return;
+    } else if (this.httpTransport !== null) {
+      this.httpTransport.sendMsg(msg);
       return;
     } else if (this.socket === null) {
       return;

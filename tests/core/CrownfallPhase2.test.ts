@@ -5,7 +5,10 @@ import {
   TerrainType,
 } from "@openfront/engine-api/game/GameTypes";
 import { IntentSchema } from "@openfront/engine-api/Schemas";
-import { nextTierScienceCost } from "@openfront/engine-lib/configuration/CrownfallPaths";
+import {
+  nextTierGoldCost,
+  nextTierScienceCost,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
 import { EngineConfig } from "@openfront/engine/configuration/EngineConfig";
 import { SelectDevPathExecution } from "@openfront/engine/execution/SelectDevPathExecution";
 import { SpawnExecution } from "@openfront/engine/execution/SpawnExecution";
@@ -91,7 +94,7 @@ describe("Crownfall Phase 2: National Development Paths", () => {
     ).toBeNull();
   });
 
-  test("unlock refuses when Science is insufficient", async () => {
+  test("unlock refuses when Science or Gold is insufficient, and Primary Path discounts Gold by 20%", async () => {
     const game = await createSpawnedGame();
     const player = game.player("player-1");
 
@@ -102,6 +105,26 @@ describe("Crownfall Phase 2: National Development Paths", () => {
     );
     executeTicks(game, 2);
     expect(player.devLevel(DevelopmentPath.Scientific)).toBe(0);
+
+    // Sufficient Science, but 0 Gold -> unlock must refuse!
+    player.addScience(1_000);
+    player.removeGold(player.gold());
+    expect(player.gold()).toBe(0n);
+    expect(player.unlockDevTier(DevelopmentPath.Scientific)).toBe(false);
+
+    // Primary Path gets 20% Gold discount (50,000n -> 40,000n)
+    player.setPrimaryPath(DevelopmentPath.Scientific);
+    expect(
+      nextTierGoldCost(player.pathProgress(), DevelopmentPath.Scientific),
+    ).toBe(40_000n);
+    expect(
+      nextTierGoldCost(player.pathProgress(), DevelopmentPath.Political),
+    ).toBe(50_000n);
+
+    player.addGold(40_000n);
+    expect(player.unlockDevTier(DevelopmentPath.Scientific)).toBe(true);
+    expect(player.gold()).toBe(0n);
+    expect(player.pathModifiers().structureCostPercent).toBeLessThan(100);
   });
 
   test("Military, Political, and Scientific paths apply symmetric pros and cons", async () => {

@@ -21,6 +21,7 @@ import { html, TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { showToast, translateText } from "../client/Utils";
 import { responseHasLinkedIdentity } from "./AccountIdentity";
+import { openCrownfallAccountModal } from "./components/CrownfallAccountModal";
 import "./components/baseComponents/Button";
 import "./components/baseComponents/Modal";
 import { BaseModal } from "./components/BaseModal";
@@ -34,6 +35,7 @@ import {
 import "./components/ToggleInputCard";
 import { modalHeader } from "./components/ui/ModalHeader";
 import { getPlayerCosmetics, prewarmCosmetics } from "./Cosmetics";
+import { loadGameClient } from "./GameClientLoader";
 import { gamePortal } from "./GamePortal";
 import { GameStartingModal } from "./GameStartingModal";
 import { showInGameAlert } from "./InGameModal";
@@ -45,6 +47,7 @@ import {
 } from "./LobbyPresets";
 import { JoinLobbyEvent } from "./Main";
 import { fallbackPlayerName, ResolvedPlayerName } from "./PlayerName";
+import { preloadAtlasData } from "./render/gl";
 import { downloadSavedGame } from "./SavedGamesApi";
 import { lastUserMeResponse } from "./UserMeBroadcast";
 import { UsernameInput } from "./UsernameInput";
@@ -62,7 +65,11 @@ import {
   toOptionalNumber,
 } from "./utilities/GameConfigHelpers";
 
-import { terrainMapFileLoader } from "./TerrainMapFileLoader";
+import {
+  loadCachedTerrainMap,
+  terrainMapFileLoader,
+} from "./TerrainMapFileLoader";
+import { preloadGameWorker } from "./WorkerClient";
 
 /**
  * Ceiling on how long a Start Game click will wait for the player's name and
@@ -154,6 +161,10 @@ const DEFAULT_OPTIONS = {
   doomsdayClockSpeed: "normal" as DoomsdayClockSpeed,
   overtime: false,
   overtimeStartMinutes: undefined as number | undefined,
+  stableHegemony: true,
+  crownfallPaths: true,
+  crownfallAugments: true,
+  crownfallRebellions: true,
 } as const;
 
 // A map earns achievements only if it has nations to conquer — the same rule
@@ -245,6 +256,12 @@ export class SinglePlayerModal extends BaseModal {
   @state() private overtime: boolean = DEFAULT_OPTIONS.overtime;
   @state() private overtimeStartMinutes: number | undefined =
     DEFAULT_OPTIONS.overtimeStartMinutes;
+  @state() private stableHegemony: boolean = DEFAULT_OPTIONS.stableHegemony;
+  @state() private crownfallPaths: boolean = DEFAULT_OPTIONS.crownfallPaths;
+  @state() private crownfallAugments: boolean =
+    DEFAULT_OPTIONS.crownfallAugments;
+  @state() private crownfallRebellions: boolean =
+    DEFAULT_OPTIONS.crownfallRebellions;
   // Drives the Start Game button's busy state. Without it the click produces
   // nothing visible until every await in startGame() settles, which reads as
   // a hang rather than as loading whenever the network is slow or absent.
@@ -334,8 +351,7 @@ export class SinglePlayerModal extends BaseModal {
     return html`<button
       class="px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors duration-200 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 whitespace-nowrap shrink-0 cursor-pointer hover:bg-yellow-500/30"
       @click=${() => {
-        this.close();
-        window.showPage?.("page-account");
+        openCrownfallAccountModal();
       }}
     >
       ${translateText("single_modal.sign_in_for_achievements")}
@@ -620,6 +636,22 @@ export class SinglePlayerModal extends BaseModal {
                     checked: this.doomsdayClock,
                     doomsdayClockSpeed: this.doomsdayClockSpeed,
                   },
+                  {
+                    labelKey: "game_settings.stable_hegemony",
+                    checked: this.stableHegemony,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_paths",
+                    checked: this.crownfallPaths,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_augments",
+                    checked: this.crownfallAugments,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_rebellions",
+                    checked: this.crownfallRebellions,
+                  },
                 ],
                 inputCards,
               },
@@ -694,6 +726,10 @@ export class SinglePlayerModal extends BaseModal {
       (this.doomsdayClock &&
         this.doomsdayClockSpeed !== DEFAULT_OPTIONS.doomsdayClockSpeed) ||
       this.overtime !== DEFAULT_OPTIONS.overtime ||
+      this.stableHegemony !== DEFAULT_OPTIONS.stableHegemony ||
+      this.crownfallPaths !== DEFAULT_OPTIONS.crownfallPaths ||
+      this.crownfallAugments !== DEFAULT_OPTIONS.crownfallAugments ||
+      this.crownfallRebellions !== DEFAULT_OPTIONS.crownfallRebellions ||
       this.disabledUnits.length > 0
     );
   }
@@ -729,6 +765,12 @@ export class SinglePlayerModal extends BaseModal {
   public async startTutorial(): Promise<void> {
     // The modal never opens on this path, so onOpen's prewarm never runs.
     void prewarmCosmetics();
+    void loadGameClient().catch(() => {});
+    void preloadGameWorker().catch(() => {});
+    void preloadAtlasData().catch(() => {});
+    void loadCachedTerrainMap(GameMapType.Tutorial, GameMapSize.Normal).catch(
+      () => {},
+    );
     if (this.starting) return;
     await this.launch(async ({ resolvedName, cosmetics }, usernameInput) => {
       const gameID = generateSingleplayerGameID();
@@ -824,6 +866,20 @@ export class SinglePlayerModal extends BaseModal {
     this.doomsdayClockSpeed = DEFAULT_OPTIONS.doomsdayClockSpeed;
     this.overtime = DEFAULT_OPTIONS.overtime;
     this.overtimeStartMinutes = DEFAULT_OPTIONS.overtimeStartMinutes;
+    this.stableHegemony = DEFAULT_OPTIONS.stableHegemony;
+    this.crownfallPaths = DEFAULT_OPTIONS.crownfallPaths;
+    this.crownfallAugments = DEFAULT_OPTIONS.crownfallAugments;
+    this.crownfallRebellions = DEFAULT_OPTIONS.crownfallRebellions;
+  }
+
+  private prewarmStartupAssets(): void {
+    void loadGameClient().catch(() => {});
+    void preloadGameWorker().catch(() => {});
+    void preloadAtlasData().catch(() => {});
+    void loadCachedTerrainMap(
+      this.selectedMap,
+      this.compactMap ? GameMapSize.Compact : GameMapSize.Normal,
+    ).catch(() => {});
   }
 
   protected onOpen(args?: Record<string, unknown>): void {
@@ -840,6 +896,7 @@ export class SinglePlayerModal extends BaseModal {
     // deliberately does not cache a failure, so the click re-pays one bounded
     // attempt. Remembering an unreachable backend is OPE-403.
     void prewarmCosmetics();
+    this.prewarmStartupAssets();
   }
 
   private exportPresetConfig(): LobbyPresetConfig {
@@ -870,6 +927,10 @@ export class SinglePlayerModal extends BaseModal {
       doomsdayClockSpeed: this.doomsdayClockSpeed,
       overtime: this.overtime,
       overtimeStartMinutes: this.overtimeStartMinutes,
+      stableHegemony: this.stableHegemony,
+      crownfallPaths: this.crownfallPaths,
+      crownfallAugments: this.crownfallAugments,
+      crownfallRebellions: this.crownfallRebellions,
     };
   }
 
@@ -899,6 +960,10 @@ export class SinglePlayerModal extends BaseModal {
     this.doomsdayClockSpeed = config.doomsdayClockSpeed ?? "normal";
     this.overtime = config.overtime ?? false;
     this.overtimeStartMinutes = config.overtimeStartMinutes;
+    this.stableHegemony = config.stableHegemony ?? true;
+    this.crownfallPaths = config.crownfallPaths ?? true;
+    this.crownfallAugments = config.crownfallAugments ?? true;
+    this.crownfallRebellions = config.crownfallRebellions ?? true;
 
     await this.loadNationCount();
     if (config.nations !== undefined) {
@@ -958,6 +1023,7 @@ export class SinglePlayerModal extends BaseModal {
     this.useRandomMap = true;
     this.selectedMap = getRandomMapType();
     void this.loadNationCount();
+    this.prewarmStartupAssets();
   }
 
   private handleConfigRandomMapSelected = () => {
@@ -968,6 +1034,7 @@ export class SinglePlayerModal extends BaseModal {
     this.selectedMap = value;
     this.useRandomMap = false;
     void this.loadNationCount();
+    this.prewarmStartupAssets();
   }
 
   private handleConfigMapSelected = (e: Event) => {
@@ -1037,6 +1104,18 @@ export class SinglePlayerModal extends BaseModal {
         break;
       case "game_settings.doomsday_clock":
         this.doomsdayClock = checked;
+        break;
+      case "game_settings.stable_hegemony":
+        this.stableHegemony = checked;
+        break;
+      case "game_settings.crownfall_paths":
+        this.crownfallPaths = checked;
+        break;
+      case "game_settings.crownfall_augments":
+        this.crownfallAugments = checked;
+        break;
+      case "game_settings.crownfall_rebellions":
+        this.crownfallRebellions = checked;
         break;
       default:
         break;
@@ -1382,6 +1461,12 @@ export class SinglePlayerModal extends BaseModal {
                   },
                 }
               : {}),
+            ...(this.stableHegemony
+              ? {}
+              : { stableHegemony: { enabled: false } }),
+            ...(this.crownfallPaths ? {} : { disablePaths: true }),
+            ...(this.crownfallAugments ? {} : { disableAugments: true }),
+            ...(this.crownfallRebellions ? {} : { disableRebellions: true }),
           },
           lobbyCreatedAt: Date.now(), // ms; server should be authoritative in MP
         },

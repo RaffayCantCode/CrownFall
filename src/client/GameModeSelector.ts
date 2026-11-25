@@ -6,10 +6,10 @@ import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { ClientEnv } from "src/client/ClientEnv";
 import { getDesktopSessionState } from "./Auth";
-import "./components/CrownfallAccountModal";
-import type {
-  CrownfallAccount,
-  CrownfallAccountModal,
+import {
+  getCurrentCrownfallAccount,
+  openCrownfallAccountModal,
+  type CrownfallAccount,
 } from "./components/CrownfallAccountModal";
 import "./components/IOSAddToHomeScreenBanner";
 import {
@@ -439,6 +439,11 @@ export class GameModeSelector extends LitElement {
     document.addEventListener("join-lobby", this.onJoinLobby);
     document.addEventListener("leave-lobby", this.onLeaveLobby);
     document.addEventListener("menu-restored", this.onLeaveLobby);
+    this.crownfallAccount = getCurrentCrownfallAccount();
+    document.addEventListener(
+      "crownfall-account-changed",
+      this.onCrownfallAccountChanged,
+    );
     // Pick up the current value in case username-input validated before us.
     const usernameInput = document.querySelector(
       "username-input",
@@ -484,8 +489,32 @@ export class GameModeSelector extends LitElement {
     document.removeEventListener("join-lobby", this.onJoinLobby);
     document.removeEventListener("leave-lobby", this.onLeaveLobby);
     document.removeEventListener("menu-restored", this.onLeaveLobby);
+    document.removeEventListener(
+      "crownfall-account-changed",
+      this.onCrownfallAccountChanged,
+    );
     super.disconnectedCallback();
   }
+
+  private onCrownfallAccountChanged = (e: Event) => {
+    const acc =
+      (e as CustomEvent<{ account: CrownfallAccount | null }>).detail
+        ?.account ?? null;
+    this.crownfallAccount = acc;
+    if (acc?.commanderName) {
+      const hiddenInput = this.querySelector(
+        "username-input",
+      ) as UsernameInput | null;
+      if (hiddenInput) {
+        const stored = hiddenInput.setCustomOrRandomName(acc.commanderName);
+        this.customNameDraft = stored;
+        this.inputValid = hiddenInput.canPlay();
+      } else {
+        this.customNameDraft = acc.commanderName;
+        localStorage.setItem("username", acc.commanderName);
+      }
+    }
+  };
 
   public resetJoinState(): void {
     this.inLobby = false;
@@ -863,16 +892,12 @@ export class GameModeSelector extends LitElement {
               <span>${translateText("crownfall.menu_settings")}</span>
             </button>
 
-            <!-- ACCOUNT (Cloudflare D1 Saved Commander Name) -->
+            <!-- ACCOUNT -->
             <button
               type="button"
               data-menu-action="account"
               @click=${() => {
-                (
-                  this.querySelector(
-                    "crownfall-account-modal",
-                  ) as CrownfallAccountModal | null
-                )?.open(this.customNameDraft.trim());
+                openCrownfallAccountModal(this.customNameDraft.trim());
               }}
               class="flex items-center justify-center gap-2 py-2 text-xs font-semibold tracking-wider uppercase text-[#9aa3b2] hover:text-[#f3d27a] transition-colors cursor-pointer"
             >
@@ -881,30 +906,6 @@ export class GameModeSelector extends LitElement {
                     <span>@${this.crownfallAccount.username} · Account</span>`
                 : html`<span>Account · Sign In / Save Name</span>`}
             </button>
-
-            <crownfall-account-modal
-              @crownfall-account-changed=${(
-                e: CustomEvent<{ account: CrownfallAccount | null }>,
-              ) => {
-                const acc = e.detail?.account ?? null;
-                this.crownfallAccount = acc;
-                if (acc?.commanderName) {
-                  const hiddenInput = this.querySelector(
-                    "username-input",
-                  ) as UsernameInput | null;
-                  if (hiddenInput) {
-                    const stored = hiddenInput.setCustomOrRandomName(
-                      acc.commanderName,
-                    );
-                    this.customNameDraft = stored;
-                    this.inputValid = hiddenInput.canPlay();
-                  } else {
-                    this.customNameDraft = acc.commanderName;
-                    localStorage.setItem("username", acc.commanderName);
-                  }
-                }
-              }}
-            ></crownfall-account-modal>
           </div>
         </div>
 

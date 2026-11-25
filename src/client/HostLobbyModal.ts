@@ -47,6 +47,7 @@ import "./components/ToggleInputCard";
 import { inviteFriendsButton } from "./components/ui/InviteFriendsButton";
 import { modalHeader } from "./components/ui/ModalHeader";
 import { fetchCosmetics, InsufficientCurrency } from "./Cosmetics";
+import { loadGameClient } from "./GameClientLoader";
 import { gamePortal } from "./GamePortal";
 import {
   deleteLobbyPreset,
@@ -55,8 +56,13 @@ import {
   saveLobbyPreset,
 } from "./LobbyPresets";
 import { JoinLobbyEvent } from "./Main";
-import { terrainMapFileLoader } from "./TerrainMapFileLoader";
+import { preloadAtlasData } from "./render/gl";
+import {
+  loadCachedTerrainMap,
+  terrainMapFileLoader,
+} from "./TerrainMapFileLoader";
 import { UserSettings } from "./UserSettings";
+import { preloadGameWorker } from "./WorkerClient";
 import {
   getBotsForCompactMap,
   getNationsForCompactMap,
@@ -118,6 +124,10 @@ export class HostLobbyModal extends BaseModal {
   @state() private doomsdayClockSpeed: DoomsdayClockSpeed = "normal";
   @state() private overtime: boolean = false;
   @state() private overtimeStartMinutes: number | undefined = undefined;
+  @state() private stableHegemony: boolean = true;
+  @state() private crownfallPaths: boolean = true;
+  @state() private crownfallAugments: boolean = true;
+  @state() private crownfallRebellions: boolean = true;
   @state() private anonymizeNames: boolean = false;
   @state() private nameReveals: string[] = [];
   @state() private whitelistEnabled: boolean = false;
@@ -475,7 +485,7 @@ export class HostLobbyModal extends BaseModal {
       secondsRemaining === null
         ? this.queued
           ? translateText("host_modal.queued_waiting")
-          : this.seatedPlayerCount() === 1
+          : this.seatedPlayerCount() < 1
             ? translateText("host_modal.waiting")
             : translateText("game_settings.start")
         : // A queued lobby's countdown belongs to the public queue; the host
@@ -772,6 +782,22 @@ export class HostLobbyModal extends BaseModal {
                     checked: this.doomsdayClock,
                     doomsdayClockSpeed: this.doomsdayClockSpeed,
                   },
+                  {
+                    labelKey: "game_settings.stable_hegemony",
+                    checked: this.stableHegemony,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_paths",
+                    checked: this.crownfallPaths,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_augments",
+                    checked: this.crownfallAugments,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_rebellions",
+                    checked: this.crownfallRebellions,
+                  },
                   // Host cheats and public listing are mutually exclusive
                   // (the server rejects both combinations), so the controls
                   // disappear while the lobby is listed.
@@ -858,7 +884,7 @@ export class HostLobbyModal extends BaseModal {
             .uppercase=${secondsRemaining === null}
             ?disable=${
               this.queued ||
-              (this.lobbyStartAt === null && this.seatedPlayerCount() < 2)
+              (this.lobbyStartAt === null && this.seatedPlayerCount() < 1)
             }
             @click=${this.toggleGameStartTimer}
           ></o-button>
@@ -926,20 +952,32 @@ export class HostLobbyModal extends BaseModal {
     `;
   }
 
+  private prewarmStartupAssets(): void {
+    void loadGameClient().catch(() => {});
+    void preloadGameWorker().catch(() => {});
+    void preloadAtlasData().catch(() => {});
+    void loadCachedTerrainMap(
+      this.selectedMap,
+      this.compactMap ? GameMapSize.Compact : GameMapSize.Normal,
+    ).catch(() => {});
+  }
+
   protected onOpen(args?: Record<string, unknown>): void {
     this.lobbyPresets = this.userSettings.getLobbyPresets();
+    this.prewarmStartupAssets();
     // Re-armed here (not in onClose's reset) so that once
     // closeWithoutLeaving() disarms it, no close cascade — e.g. another
     // modal's close() navigating via showPage, which force-closes this one —
     // can re-arm it and disconnect the host mid game-start.
     this.leaveLobbyOnClose = true;
     this.startLobbyUpdates();
+    this.canListPublicly = true;
     void getUserMe().then((userMe) => {
-      // Dev skips the entitlement gate (matching the server) so the
-      // listing flow is testable locally.
       this.canListPublicly =
         ClientEnv.env() === GameEnv.Dev ||
-        (userMe !== false && userMe.player.canCreatePublicLobbies);
+        ClientEnv.isCloudflareMultiplayer?.() === true ||
+        userMe === false ||
+        userMe.player.canCreatePublicLobbies;
       this.hardBalance =
         userMe === false ? 0 : (userMe.player.currency?.hard ?? 0);
     });
@@ -1126,6 +1164,10 @@ export class HostLobbyModal extends BaseModal {
     this.doomsdayClockSpeed = "normal";
     this.overtime = false;
     this.overtimeStartMinutes = undefined;
+    this.stableHegemony = true;
+    this.crownfallPaths = true;
+    this.crownfallAugments = true;
+    this.crownfallRebellions = true;
     this.anonymizeNames = false;
     this.nameReveals = [];
     this.whitelistEnabled = false;
@@ -1151,6 +1193,7 @@ export class HostLobbyModal extends BaseModal {
   private async handleSelectRandomMap() {
     this.useRandomMap = true;
     this.selectedMap = getRandomMapType();
+    this.prewarmStartupAssets();
     await this.loadNationCount();
     void this.putGameConfig();
   }
@@ -1162,6 +1205,7 @@ export class HostLobbyModal extends BaseModal {
   private async handleMapSelection(value: GameMapType) {
     this.selectedMap = value;
     this.useRandomMap = false;
+    this.prewarmStartupAssets();
     await this.loadNationCount();
     void this.putGameConfig();
   }
@@ -1236,6 +1280,22 @@ export class HostLobbyModal extends BaseModal {
         break;
       case "game_settings.doomsday_clock":
         this.doomsdayClock = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.stable_hegemony":
+        this.stableHegemony = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_paths":
+        this.crownfallPaths = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_augments":
+        this.crownfallAugments = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_rebellions":
+        this.crownfallRebellions = checked;
         void this.putGameConfig();
         break;
       case "host_modal.host_cheats":
@@ -1772,6 +1832,10 @@ export class HostLobbyModal extends BaseModal {
       doomsdayClockSpeed: this.doomsdayClockSpeed,
       overtime: this.overtime,
       overtimeStartMinutes: this.overtimeStartMinutes,
+      stableHegemony: this.stableHegemony,
+      crownfallPaths: this.crownfallPaths,
+      crownfallAugments: this.crownfallAugments,
+      crownfallRebellions: this.crownfallRebellions,
       spawnImmunity: this.spawnImmunity,
       spawnImmunityDurationMinutes: this.spawnImmunityDurationMinutes,
       playerLimit: this.playerLimit,
@@ -1819,6 +1883,10 @@ export class HostLobbyModal extends BaseModal {
     this.doomsdayClockSpeed = config.doomsdayClockSpeed ?? "normal";
     this.overtime = config.overtime ?? false;
     this.overtimeStartMinutes = config.overtimeStartMinutes;
+    this.stableHegemony = config.stableHegemony ?? true;
+    this.crownfallPaths = config.crownfallPaths ?? true;
+    this.crownfallAugments = config.crownfallAugments ?? true;
+    this.crownfallRebellions = config.crownfallRebellions ?? true;
 
     if (config.spawnImmunity !== undefined) {
       this.spawnImmunity = config.spawnImmunity;
@@ -1997,6 +2065,12 @@ export class HostLobbyModal extends BaseModal {
                   startMinutes: this.overtimeStartMinutes ?? 30,
                 }
               : { enabled: false },
+            stableHegemony: this.stableHegemony
+              ? { enabled: true }
+              : { enabled: false },
+            disablePaths: this.crownfallPaths ? null : true,
+            disableAugments: this.crownfallAugments ? null : true,
+            disableRebellions: this.crownfallRebellions ? null : true,
             anonymizeNames: this.anonymizeNames,
             nameReveals: this.nameReveals,
             allowedPublicIds: this.whitelistEnabled

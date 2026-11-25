@@ -22,12 +22,23 @@ import {
   ReadSnapshotHeaderMessage,
   WorkerMessage,
 } from "@openfront/engine-api/worker/WorkerMessages";
-import {
-  loadMapFiles,
-  mapFilesTransfer,
-} from "@openfront/shared/GameMapLoader";
+import { mapFilesTransfer } from "@openfront/shared/GameMapLoader";
 import { generateID } from "@openfront/shared/SharedUtil";
-import { terrainMapFileLoader } from "./TerrainMapFileLoader";
+import { loadCachedMapFiles } from "./TerrainMapFileLoader";
+
+let workerConstructorPromise: Promise<new () => Worker> | null = null;
+
+export function preloadGameWorker(): Promise<new () => Worker> {
+  workerConstructorPromise ??= import(
+    "@openfront/engine/worker/Worker.worker?worker&inline"
+  )
+    .then((m) => m.default)
+    .catch((err) => {
+      workerConstructorPromise = null;
+      throw err;
+    });
+  return workerConstructorPromise;
+}
 
 // Inlined as a same-origin Blob (Vite's `?worker&inline`), sidestepping the
 // cross-origin `new Worker(url)` restriction that would otherwise apply when
@@ -35,8 +46,7 @@ import { terrainMapFileLoader } from "./TerrainMapFileLoader";
 // ~700 KB base64 payload in its own chunk, fetched when a game starts,
 // instead of inside the main bundle.
 export async function createGameWorker(): Promise<Worker> {
-  const { default: GameWorker } =
-    await import("@openfront/engine/worker/Worker.worker?worker&inline");
+  const GameWorker = await preloadGameWorker();
   return new GameWorker();
 }
 
@@ -138,7 +148,7 @@ export class WorkerClient {
     const created = createGameWorker();
     let map: MapFiles;
     try {
-      map = await loadMapFiles(terrainMapFileLoader, gameMap, gameMapSize);
+      map = await loadCachedMapFiles(gameMap, gameMapSize);
     } catch (err) {
       // Nothing will use the worker; don't leave it running.
       created.then(

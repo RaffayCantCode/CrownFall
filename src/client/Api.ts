@@ -71,6 +71,10 @@ import {
   userAuth,
 } from "./Auth";
 import { ClientEnv } from "./ClientEnv";
+import {
+  getCurrentCrownfallAccount,
+  toCrownfallUserMeResponse,
+} from "./components/CrownfallAccountModal";
 import { ensureServerList } from "./ServerList";
 import { UserSettings } from "./UserSettings";
 
@@ -231,6 +235,12 @@ async function requestUserMe(): Promise<{
   aborted: boolean;
 }> {
   try {
+    if (
+      ClientEnv.isCloudflareMultiplayer?.() === true ||
+      getApiBase() === "https://api."
+    ) {
+      return { profile: false, aborted: false };
+    }
     const userAuthResult = await userAuth();
     if (!userAuthResult) return { profile: false, aborted: false };
     const { jwt, claims } = userAuthResult;
@@ -290,6 +300,10 @@ async function requestUserMe(): Promise<{
 }
 
 export async function getUserMe(): Promise<UserMeResponse | false> {
+  const crownfallAcc = getCurrentCrownfallAccount();
+  if (crownfallAcc !== null) {
+    return toCrownfallUserMeResponse(crownfallAcc);
+  }
   if (__userMe !== null) {
     return __userMe;
   }

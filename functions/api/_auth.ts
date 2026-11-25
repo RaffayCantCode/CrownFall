@@ -1,32 +1,28 @@
 /**
- * Crownfall Cloudflare Pages Functions — Shared D1 Auth & Session Helpers.
- * Uses only standard Web Crypto APIs (zero Node.js dependencies) so it runs
- * natively on Cloudflare Pages Functions / Workers with any D1 database bound as `DB`.
+ * Crownfall Cloudflare Pages Functions — Shared Auth & Session Helpers.
+ * Uses standard Web Crypto APIs so it runs natively on Cloudflare Pages Functions
+ * with any D1 database bound as `DB` (plus automatic isolate fallback).
  */
 
-export interface D1PreparedStatementLike {
-  bind(...values: unknown[]): D1PreparedStatementLike;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  run(): Promise<{ success: boolean }>;
-}
+import {
+  type CrownfallEnv,
+  type D1DatabaseLike,
+  getDb,
+  type PagesContext,
+} from "./_db";
 
-export interface D1DatabaseLike {
-  prepare(query: string): D1PreparedStatementLike;
-}
+export type { CrownfallEnv, D1DatabaseLike, PagesContext };
 
-export interface CrownfallEnv {
-  DB?: D1DatabaseLike;
-}
-
-export interface PagesContext {
-  request: Request;
-  env: CrownfallEnv;
+export interface MapAchievementEntry {
+  mapName: string;
+  difficulty: string;
 }
 
 export interface PublicAccount {
   id: string;
   username: string;
   commanderName: string;
+  achievements: MapAchievementEntry[];
 }
 
 const SESSION_COOKIE_NAME = "crownfall_session";
@@ -48,17 +44,8 @@ export function jsonResponse(
   });
 }
 
-export function requireDb(env: CrownfallEnv): D1DatabaseLike | Response {
-  if (!env.DB) {
-    return jsonResponse(
-      {
-        error:
-          "Database binding `DB` is not configured. Bind your Cloudflare D1 database as `DB` in Pages Settings -> Bindings.",
-      },
-      503,
-    );
-  }
-  return env.DB;
+export async function requireDb(env: CrownfallEnv): Promise<D1DatabaseLike> {
+  return getDb(env);
 }
 
 export function normalizeUsername(raw: unknown): string | null {
@@ -73,6 +60,41 @@ export function normalizeCommanderName(raw: unknown): string | null {
   const trimmed = raw.trim().replace(/\s+/g, " ");
   if (trimmed.length < 2 || trimmed.length > 24) return null;
   return trimmed;
+}
+
+export function sanitizeAchievements(raw: unknown): MapAchievementEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const validDiffs = new Set(["Easy", "Medium", "Hard", "Impossible"]);
+  const seen = new Set<string>();
+  const out: MapAchievementEntry[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const mapName = (item as { mapName?: unknown }).mapName;
+    const difficulty = (item as { difficulty?: unknown }).difficulty;
+    if (
+      typeof mapName !== "string" ||
+      mapName.length === 0 ||
+      mapName.length > 64 ||
+      typeof difficulty !== "string" ||
+      !validDiffs.has(difficulty)
+    ) {
+      continue;
+    }
+    const key = `${mapName}::${difficulty}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ mapName, difficulty });
+  }
+  return out;
+}
+
+export function parseAchievementsJson(raw: unknown): MapAchievementEntry[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    return sanitizeAchievements(JSON.parse(raw));
+  } catch {
+    return [];
+  }
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -214,19 +236,25 @@ export async function getAuthenticatedAccount(
 
   const row = await db
     .prepare(
-      `SELECT a.id, a.username, a.commander_name
+      `SELECT a.id, a.username, a.commander_name, a.achievements_json
        FROM sessions s
        JOIN accounts a ON a.id = s.account_id
        WHERE s.token_hash = ? AND s.expires_at > ?`,
     )
     .bind(tokenHash, now)
-    .first<{ id: string; username: string; commander_name: string }>();
+    .first<{
+      id: string;
+      username: string;
+      commander_name: string;
+      achievements_json?: string;
+    }>();
 
   if (!row) return null;
   return {
     id: row.id,
     username: row.username,
     commanderName: row.commander_name,
+    achievements: parseAchievementsJson(row.achievements_json),
   };
 }
 

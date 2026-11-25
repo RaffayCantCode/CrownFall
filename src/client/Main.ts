@@ -183,6 +183,7 @@ import "./UsernameInput";
 import { UsernameInput } from "./UsernameInput";
 import { UserSettings } from "./UserSettings";
 import "./components/BannedModal";
+import "./components/CrownfallAccountModal";
 import "./components/DesktopStatusBar";
 import "./components/MarketingConsentToast";
 import "./components/PurchaseNudgeModal";
@@ -527,8 +528,7 @@ class Client {
     });
     modalRouter.register("clan", { tag: "clan-modal", pageId: "page-clan" });
     modalRouter.register("account", {
-      tag: "account-modal",
-      pageId: "page-account",
+      tag: "crownfall-account-modal",
     });
     // Profile-menu modals: popup style, so no pageId.
     modalRouter.register("account-settings", { tag: "account-settings-modal" });
@@ -589,6 +589,8 @@ class Client {
     this.turnstileTokenPromise = null;
     if (
       !isDesktopShell() &&
+      ClientEnv.isCloudflareMultiplayer?.() !== true &&
+      ClientEnv.turnstileSiteKey() !== "" &&
       !isReplayShellHost(window.location.hostname) &&
       !this.gamePortal.isOnGamePortal()
     ) {
@@ -2518,6 +2520,8 @@ class Client {
     if (signal?.aborted) return null;
     if (
       ClientEnv.env() === GameEnv.Dev ||
+      ClientEnv.isCloudflareMultiplayer?.() === true ||
+      ClientEnv.turnstileSiteKey() === "" ||
       isDesktopShell() ||
       // Single-player and replays: no server to verify a token against (and
       // on the CDN replay shells Turnstile cannot load at all). Shared with

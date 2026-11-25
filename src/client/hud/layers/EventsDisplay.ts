@@ -1,5 +1,10 @@
-import { AllPlayers, MessageType } from "@openfront/engine-api/game/GameTypes";
 import {
+  AllianceActionType,
+  AllPlayers,
+  MessageType,
+} from "@openfront/engine-api/game/GameTypes";
+import {
+  AllianceActionReplyUpdate,
   AllianceExpiredUpdate,
   AllianceRequestReplyUpdate,
   BrokeAllianceUpdate,
@@ -17,7 +22,10 @@ import { customElement, query, state } from "lit/decorators.js";
 import { DirectiveResult } from "lit/directive.js";
 import { unsafeHTML, UnsafeHTMLDirective } from "lit/directives/unsafe-html.js";
 import { Controller } from "../../Controller";
-import { SendAllianceRequestIntentEvent } from "../../Transport";
+import {
+  SendAllianceActionRequestIntentEvent,
+  SendAllianceRequestIntentEvent,
+} from "../../Transport";
 import { UserSettings } from "../../UserSettings";
 
 import { GoToPlayerEvent, GoToUnitEvent } from "../../TransformHandler";
@@ -129,6 +137,10 @@ export class EventsDisplay extends LitElement implements Controller {
       GameUpdateType.AllianceRequestReply,
       this.onAllianceRequestReplyEvent.bind(this),
     ],
+    [
+      GameUpdateType.AllianceActionReply,
+      this.onAllianceActionReplyEvent.bind(this),
+    ],
     [GameUpdateType.BrokeAlliance, this.onBrokeAllianceEvent.bind(this)],
     [GameUpdateType.TargetPlayer, this.onTargetPlayerEvent.bind(this)],
     [GameUpdateType.Emoji, this.onEmojiMessageEvent.bind(this)],
@@ -146,6 +158,8 @@ export class EventsDisplay extends LitElement implements Controller {
   private allianceConfirmationUnsub: (() => void) | null = null;
   private onAllianceRequestSentConfirmationBound =
     this.onAllianceRequestSentConfirmation.bind(this);
+  private onAllianceActionSentConfirmationBound =
+    this.onAllianceActionSentConfirmation.bind(this);
 
   private unsubscribeBus(): void {
     this.allianceConfirmationUnsub?.();
@@ -161,17 +175,43 @@ export class EventsDisplay extends LitElement implements Controller {
         SendAllianceRequestIntentEvent,
         this.onAllianceRequestSentConfirmationBound,
       );
-      this.allianceConfirmationUnsub = () =>
+      bus.on(
+        SendAllianceActionRequestIntentEvent,
+        this.onAllianceActionSentConfirmationBound,
+      );
+      this.allianceConfirmationUnsub = () => {
         bus.off?.(
           SendAllianceRequestIntentEvent,
           this.onAllianceRequestSentConfirmationBound,
         );
+        bus.off?.(
+          SendAllianceActionRequestIntentEvent,
+          this.onAllianceActionSentConfirmationBound,
+        );
+      };
     }
     return () => {
       if (gen === this.initGeneration) {
         this.dispose();
       }
     };
+  }
+
+  private onAllianceActionSentConfirmation(
+    e: SendAllianceActionRequestIntentEvent,
+  ) {
+    const myPlayer = this.game.myPlayer();
+    if (!myPlayer) return;
+    const recipient = this.game.player(e.recipientID);
+    if (!recipient) return;
+    this.addEvent({
+      description: translateText("crownfall.alliance.action_sent", {
+        name: recipient.displayName(),
+        action: translateText(`crownfall.alliance.label_${e.actionType}`),
+      }),
+      type: MessageType.ALLIANCE_REQUEST,
+      createdAt: this.game.ticks(),
+    });
   }
 
   dispose(): void {
@@ -327,7 +367,10 @@ export class EventsDisplay extends LitElement implements Controller {
     }
 
     let description: string = event.message;
-    if (event.message.startsWith("events_display.")) {
+    if (
+      event.message.startsWith("events_display.") ||
+      event.message.startsWith("crownfall.")
+    ) {
       description = translateText(event.message, this.resolveParams(event));
     }
 
@@ -427,6 +470,97 @@ export class EventsDisplay extends LitElement implements Controller {
         update.accepted ? "alliance-accepted" : "alliance-declined",
       ),
     );
+  }
+
+  onAllianceActionReplyEvent(update: AllianceActionReplyUpdate) {
+    const myPlayer = this.game.myPlayer();
+    if (!myPlayer || update.requestorID !== myPlayer.smallID()) {
+      return;
+    }
+
+    const recipient = this.game.playerBySmallID(
+      update.recipientID,
+    ) as PlayerView;
+    const name = recipient?.displayName?.() ?? "Ally";
+    const targetName =
+      update.targetID !== undefined && update.targetID !== null
+        ? ((this.game.playerBySmallID(update.targetID) as PlayerView | null)?.displayName?.() ??
+          "")
+        : "";
+    const troopsStr =
+      update.troopsAmount !== undefined
+        ? renderTroops(update.troopsAmount)
+        : "0";
+    const goldStr =
+      update.goldAmount !== undefined ? renderNumber(update.goldAmount) : "0";
+
+    let description: string;
+    if (update.accepted) {
+      switch (update.actionType) {
+        case AllianceActionType.TroopsForGold:
+          description = translateText(
+            "crownfall.alliance.reply_accept_troops_for_gold",
+            { name, troops: troopsStr, gold: goldStr },
+          );
+          break;
+        case AllianceActionType.GoldForTroops:
+          description = translateText(
+            "crownfall.alliance.reply_accept_gold_for_troops",
+            { name, gold: goldStr, troops: troopsStr },
+          );
+          break;
+        case AllianceActionType.GoldAid:
+          description = translateText(
+            "crownfall.alliance.reply_accept_gold_aid",
+            { name, gold: goldStr },
+          );
+          break;
+        case AllianceActionType.JointAttack:
+          description = translateText(
+            "crownfall.alliance.reply_accept_joint_attack",
+            { name, target: targetName, troops: troopsStr },
+          );
+          break;
+        case AllianceActionType.DefenseAid:
+          description = translateText(
+            "crownfall.alliance.reply_accept_defense_aid",
+            { name, troops: troopsStr },
+          );
+          break;
+        case AllianceActionType.Reinforcements:
+        default:
+          description = translateText(
+            "crownfall.alliance.reply_accept_reinforcements",
+            { name, troops: troopsStr },
+          );
+          break;
+      }
+    } else if (update.reason === "expired") {
+      description = translateText("crownfall.alliance.reply_expired", {
+        name,
+        action: translateText(`crownfall.alliance.label_${update.actionType}`),
+      });
+    } else if (update.reason === "insufficient") {
+      description = translateText("crownfall.alliance.reply_insufficient", {
+        name,
+        action: translateText(`crownfall.alliance.label_${update.actionType}`),
+      });
+    } else {
+      description = translateText("crownfall.alliance.reply_declined", {
+        name,
+        action: translateText(`crownfall.alliance.label_${update.actionType}`),
+      });
+    }
+
+    this.addEvent({
+      description,
+      type: update.accepted
+        ? MessageType.ALLIANCE_ACCEPTED
+        : MessageType.ALLIANCE_REJECTED,
+      highlight: true,
+      createdAt: this.game.ticks(),
+      focusID: update.recipientID,
+    });
   }
 
   onBrokeAllianceEvent(update: BrokeAllianceUpdate) {

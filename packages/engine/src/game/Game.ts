@@ -557,6 +557,16 @@ export interface Player extends PlayerLike {
   bestTransportShipSpawn(tile: TileRef): TileRef | false;
 }
 
+export interface PendingAllianceActionView {
+  id: number;
+  requestorID: PlayerID;
+  recipientID: PlayerID;
+  actionType: AllianceActionType;
+  targetID: PlayerID | null;
+  createdAt: Tick;
+  expiresAt: Tick;
+}
+
 export interface Game extends GameLike {
   // Map & Dimensions
   isOnMap(cell: Cell): boolean;
@@ -641,6 +651,9 @@ export interface Game extends GameLike {
     requestID: number,
     accept: boolean,
   ): boolean;
+  pendingAllianceActionsFor(
+    recipient: Player,
+  ): readonly PendingAllianceActionView[];
 
   // Units
   unit(id: number): Unit | undefined;

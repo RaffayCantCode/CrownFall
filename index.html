@@ -183,7 +183,7 @@
         cdnBase: <%- cdnBase %>,
         gameEnv: <%- gameEnv %>,<%- typeof cluster !== "undefined" && cluster ? "\n        cluster: " + cluster + "," : "" %><%- typeof instanceLetter !== "undefined" && instanceLetter ? "\n        instanceLetter: " + instanceLetter + "," : "" %>
         turnstileSiteKey: <%- turnstileSiteKey %>,
-        jwtAudience: <%- jwtAudience %>,<%- typeof stripePublishableKey !== "undefined" && stripePublishableKey ? "\n        stripePublishableKey: " + stripePublishableKey + "," : "" %><%- typeof faroCollectorUrl !== "undefined" && faroCollectorUrl ? "\n        faroCollectorUrl: " + faroCollectorUrl + "," : "" %><%- typeof instanceId !== "undefined" && instanceId ? "\n        instanceId: " + instanceId + "," : "" %><%- typeof serverHost !== "undefined" && serverHost ? "\n        serverHost: " + serverHost + "," : "" %><%- typeof siteHost !== "undefined" && siteHost ? "\n        siteHost: " + siteHost + "," : "" %>
+        jwtAudience: <%- jwtAudience %>,<%- typeof stripePublishableKey !== "undefined" && stripePublishableKey ? "\n        stripePublishableKey: " + stripePublishableKey + "," : "" %><%- typeof faroCollectorUrl !== "undefined" && faroCollectorUrl ? "\n        faroCollectorUrl: " + faroCollectorUrl + "," : "" %><%- typeof instanceId !== "undefined" && instanceId ? "\n        instanceId: " + instanceId + "," : "" %><%- typeof serverHost !== "undefined" && serverHost ? "\n        serverHost: " + serverHost + "," : "" %><%- typeof siteHost !== "undefined" && siteHost ? "\n        siteHost: " + siteHost + "," : "" %><%- typeof cloudflareMultiplayer !== "undefined" && cloudflareMultiplayer ? "\n        cloudflareMultiplayer: " + cloudflareMultiplayer + "," : "" %>
       };
       // Set here rather than from the bundle so the first paint already has the
       // desktop layout. The shell's preload defines openfrontDesktop before
@@ -459,6 +459,8 @@
       <subscription-modal></subscription-modal>
       <news-modal></news-modal>
     </div>
+
+    <crownfall-account-modal></crownfall-account-modal>
 
     <!-- Game components -->
     <div id="app"></div>

@@ -47,6 +47,10 @@ export const LobbyPresetConfigSchema = z.object({
   doomsdayClockSpeed: z.enum(DOOMSDAY_CLOCK_SPEEDS).optional(),
   overtime: z.boolean().optional(),
   overtimeStartMinutes: z.number().int().min(1).max(120).optional(),
+  stableHegemony: z.boolean().optional(),
+  crownfallPaths: z.boolean().optional(),
+  crownfallAugments: z.boolean().optional(),
+  crownfallRebellions: z.boolean().optional(),
 
   // Host-specific options
   spawnImmunity: z.boolean().optional(),

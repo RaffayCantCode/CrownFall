@@ -6,17 +6,17 @@ import {
   normalizeUsername,
   type PagesContext,
   requireDb,
+  sanitizeAchievements,
 } from "../_auth";
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const dbOrError = requireDb(context.env);
-  if (dbOrError instanceof Response) return dbOrError;
-  const db = dbOrError;
+  const db = await requireDb(context.env);
 
   let body: {
     username?: unknown;
     password?: unknown;
     commanderName?: unknown;
+    achievements?: unknown;
   };
   try {
     body = (await context.request.json()) as typeof body;
@@ -44,6 +44,7 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 
   const commanderName =
     normalizeCommanderName(body.commanderName) ?? username;
+  const achievements = sanitizeAchievements(body.achievements);
 
   const existing = await db
     .prepare("SELECT id FROM accounts WHERE username = ?")
@@ -62,15 +63,23 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 
   await db
     .prepare(
-      "INSERT INTO accounts (id, username, commander_name, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO accounts (id, username, commander_name, password_hash, achievements_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(id, username, commanderName, passwordHash, now, now)
+    .bind(
+      id,
+      username,
+      commanderName,
+      passwordHash,
+      JSON.stringify(achievements),
+      now,
+      now,
+    )
     .run();
 
   const cookie = await createSessionCookie(db, context.request, id);
   return jsonResponse(
     {
-      account: { id, username, commanderName },
+      account: { id, username, commanderName, achievements },
     },
     201,
     { "Set-Cookie": cookie },
