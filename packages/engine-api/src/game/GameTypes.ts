@@ -23,6 +23,39 @@ export enum TaxRate {
   High = "high",
 }
 
+export enum DevelopmentPath {
+  Military = "military",
+  Political = "political",
+  Scientific = "scientific",
+}
+
+export enum AugmentId {
+  TotalMobilisation = "total_mobilisation",
+  IndustrialPowerhouse = "industrial_powerhouse",
+  PeoplesFirst = "peoples_first",
+  WarProfiteers = "war_profiteers",
+  FortressNation = "fortress_nation",
+  TechnologicalRace = "technological_race",
+  RapidExpansion = "rapid_expansion",
+  GoldenDiplomacy = "golden_diplomacy",
+  IronDiscipline = "iron_discipline",
+  AerospaceCommand = "aerospace_command",
+  CivicRenaissance = "civic_renaissance",
+  BlitzLogistics = "blitz_logistics",
+}
+
+export enum AllianceActionType {
+  JointAttack = "joint_attack",
+  Reinforcements = "reinforcements",
+  DefenseAid = "defense_aid",
+}
+
+export enum NationalProject {
+  SurgeMobilisation = "surge_mobilisation",
+  NationalReconciliation = "national_reconciliation",
+  EmpOverdrive = "emp_overdrive",
+}
+
 export type WarshipState = {
   state: "patrolling" | "retreating" | "docked";
   patrolTile?: TileRef;

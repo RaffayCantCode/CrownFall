@@ -1,6 +1,8 @@
 import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   Cell,
+  MessageType,
+  PlayerInfo,
   PlayerType,
   Structures,
   UnitType,
@@ -12,6 +14,13 @@ import {
   CROWNFALL_CONFIG,
   sciencePerSecond,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  computeEmigrationPerSecond,
+  computeNeighborMigrationShare,
+  crisisTroopRegenPercent,
+  CROWNFALL_CRISIS_CONFIG,
+  nextRebellionMeter,
+} from "@openfront/engine-lib/configuration/CrownfallCrises";
 import { zInt, zPlayerRef } from "@openfront/engine-lib/snapshot/SnapshotType";
 import { getMode, simpleHash } from "@openfront/engine-lib/Util";
 import { z } from "zod";
@@ -28,6 +37,7 @@ import type {
   SnapshotReader,
   SnapshotWriter,
 } from "../snapshot/SnapshotContext";
+import { TribeExecution } from "./TribeExecution";
 
 const TICKS_PER_CLUSTER_CALC = 20;
 
@@ -103,7 +113,14 @@ export class PlayerExecution implements Execution {
       return;
     }
 
-    const troopInc = this.config.troopIncreaseRate(this.player);
+    const pathMods = this.player.pathModifiers();
+    const baseTroopInc = this.config.troopIncreaseRate(this.player);
+    const crisisRegen = crisisTroopRegenPercent(this.player.stability());
+    const combinedRegenPercent = (pathMods.troopRegenPercent * crisisRegen) / 100;
+    const troopInc =
+      combinedRegenPercent === 100
+        ? baseTroopInc
+        : (baseTroopInc * combinedRegenPercent) / 100;
     this.player.addTroops(troopInc);
     const goldFromWorkers = this.config.goldAdditionRate(this.player);
     this.player.addGold(goldFromWorkers);
@@ -113,7 +130,7 @@ export class PlayerExecution implements Execution {
 
     // Crownfall national management (1Hz)
     if (ticks % CROWNFALL_CONFIG.updateIntervalTicks === 0) {
-      this.tickCrownfallNationalManagement();
+      this.tickCrownfallNationalManagement(ticks);
     }
 
     for (const alliance of this.player.alliances()) {
@@ -148,14 +165,17 @@ export class PlayerExecution implements Execution {
     }
   }
 
-  private tickCrownfallNationalManagement(): void {
+  private tickCrownfallNationalManagement(ticks: number): void {
+    this.player.clearExpiredProject(ticks);
     const taxRate = this.player.taxRate();
     const pop = this.player.civilianPopulation();
+    const mods = this.player.pathModifiers();
     const breakdown = computeStabilityBreakdown(
       this.player,
       taxRate,
       pop,
       this.player.incomingAttacks().length,
+      mods,
     );
 
     const currentStability = this.player.stability();
@@ -180,6 +200,7 @@ export class PlayerExecution implements Execution {
       pop,
       nextStability,
       taxRate,
+      mods,
     );
     if (popDelta !== 0) {
       this.player.addCivilianPopulation(popDelta);
@@ -192,16 +213,205 @@ export class PlayerExecution implements Execution {
       nextStability,
       taxRate,
       this.config.goldMultiplier(),
+      mods,
     );
     if (taxGold > 0n) {
       this.player.addGold(taxGold);
       this.mg.stats().goldWork(this.player, taxGold);
     }
 
-    const sciGain = sciencePerSecond(this.player, updatedPop, nextStability);
+    const sciGain = sciencePerSecond(
+      this.player,
+      updatedPop,
+      nextStability,
+      mods,
+    );
     if (sciGain > 0) {
       this.player.addScience(sciGain);
     }
+
+    // Phase 5: Internal crises, cross-border migration & rebellions (humans only).
+    if (this.player.type() === PlayerType.Human) {
+      this.tickCrownfallCrises(ticks, nextStability);
+    }
+  }
+
+  private tickCrownfallCrises(ticks: number, stability: number): void {
+    // 1. Civilian emigration under Unrest / Crisis / Rebellion
+    const currentPop = this.player.civilianPopulation();
+    const emigrants = computeEmigrationPerSecond(currentPop, stability);
+    if (emigrants > 0) {
+      this.player.addCivilianPopulation(-emigrants);
+
+      const stableNeighbors: Player[] = [];
+      for (const n of this.mg.players()) {
+        if (
+          n !== this.player &&
+          n.isAlive() &&
+          n.stability() >= CROWNFALL_CRISIS_CONFIG.stableNeighborMinStability &&
+          this.player.sharesBorderWith(n)
+        ) {
+          stableNeighbors.push(n);
+        }
+      }
+      if (stableNeighbors.length > 0) {
+        stableNeighbors.sort((a, b) => a.smallID() - b.smallID());
+        const perNeighbor = computeNeighborMigrationShare(
+          emigrants,
+          stableNeighbors.length,
+        );
+        if (perNeighbor > 0) {
+          for (const neighbor of stableNeighbors) {
+            neighbor.addCivilianPopulation(perNeighbor);
+          }
+        }
+      }
+    }
+
+    // 2. Cooldown tick-down and Rebellion Meter progression
+    const prevCooldown = this.player.rebellionCooldownTicks();
+    const nextCooldown = Math.max(
+      0,
+      prevCooldown - CROWNFALL_CONFIG.updateIntervalTicks,
+    );
+    if (nextCooldown !== prevCooldown) {
+      this.player.setRebellionCooldownTicks(nextCooldown);
+    }
+
+    const prevMeter = this.player.rebellionMeter();
+    const nextMeter = nextRebellionMeter(
+      prevMeter,
+      stability,
+      this.player.numTilesOwned(),
+      nextCooldown,
+    );
+    if (nextMeter !== prevMeter) {
+      this.player.setRebellionMeter(nextMeter);
+    }
+
+    if (
+      prevMeter < CROWNFALL_CRISIS_CONFIG.rebellionWarningThreshold &&
+      nextMeter >= CROWNFALL_CRISIS_CONFIG.rebellionWarningThreshold
+    ) {
+      this.mg.displayMessage(
+        "crownfall.crisis_rebellion_warning",
+        MessageType.ATTACK_FAILED,
+        this.player.id(),
+      );
+    }
+
+    if (nextMeter >= 100) {
+      this.triggerRebellion(ticks);
+    }
+  }
+
+  private triggerRebellion(ticks: number): void {
+    const ownedCount = this.player.numTilesOwned();
+    if (ownedCount < CROWNFALL_CRISIS_CONFIG.minTilesForRebellion) {
+      this.player.setRebellionMeter(0);
+      return;
+    }
+
+    // Pick a deterministic border tile as the rebellion's seed.
+    let seedTile: TileRef | null = null;
+    for (const tile of this.player.borderTiles()) {
+      if (seedTile === null || tile < seedTile) {
+        seedTile = tile;
+      }
+    }
+    if (seedTile === null) {
+      this.player.setRebellionMeter(0);
+      return;
+    }
+
+    const maxTakeable = Math.max(
+      0,
+      ownedCount - CROWNFALL_CRISIS_CONFIG.rebellionMinRemainingTiles,
+    );
+    const targetTiles = Math.min(
+      maxTakeable,
+      CROWNFALL_CRISIS_CONFIG.rebellionMaxTilesPerUprising,
+      Math.max(
+        10,
+        Math.floor(
+          (ownedCount * CROWNFALL_CRISIS_CONFIG.rebellionTileSharePercent) /
+            100,
+        ),
+      ),
+    );
+    if (targetTiles <= 0) {
+      this.player.setRebellionMeter(0);
+      return;
+    }
+
+    // Bounded deterministic BFS over owned tiles starting from seedTile.
+    const ownerSmallID = this.player.smallID();
+    const visited = new Set<TileRef>([seedTile]);
+    const queue: TileRef[] = [seedTile];
+    const rebelTiles: TileRef[] = [];
+    let head = 0;
+
+    while (head < queue.length && rebelTiles.length < targetTiles) {
+      const cur = queue[head++];
+      rebelTiles.push(cur);
+      const count = this.map.neighbors4(cur, this.nbuf);
+      for (let i = 0; i < count; i++) {
+        const next = this.nbuf[i];
+        if (visited.has(next)) continue;
+        if (this.map.ownerID(next) !== ownerSmallID) continue;
+        visited.add(next);
+        queue.push(next);
+      }
+    }
+
+    if (rebelTiles.length === 0) {
+      this.player.setRebellionMeter(0);
+      return;
+    }
+
+    const rebelID = `RBL${this.player.smallID()}T${ticks}`;
+    const rebelInfo = new PlayerInfo(
+      `${this.player.name()} Rebels`,
+      PlayerType.Bot,
+      null,
+      rebelID,
+    );
+    const rebel = this.mg.addPlayer(rebelInfo);
+
+    const rebelTroops = Math.max(
+      500,
+      Math.floor(
+        (this.player.troops() *
+          CROWNFALL_CRISIS_CONFIG.rebellionTroopSharePercent) /
+          100,
+      ),
+    );
+    this.player.removeTroops(rebelTroops);
+    rebel.setTroops(rebelTroops);
+
+    for (const tile of rebelTiles) {
+      rebel.conquer(tile);
+    }
+
+    this.mg.addExecution(
+      new PlayerExecution(rebel),
+      new TribeExecution(rebel),
+    );
+
+    // Reset meter, start cooldown, and grant immediate post-secession stability relief.
+    this.player.setRebellionMeter(0);
+    this.player.setRebellionCooldownTicks(
+      CROWNFALL_CRISIS_CONFIG.rebellionCooldownTicks,
+    );
+    this.player.setStability(
+      this.player.stability() + CROWNFALL_CRISIS_CONFIG.rebellionStabilityRelief,
+    );
+
+    this.mg.displayMessage(
+      "crownfall.crisis_rebellion_erupted",
+      MessageType.ATTACK_FAILED,
+      this.player.id(),
+    );
   }
 
   private removeClusters() {

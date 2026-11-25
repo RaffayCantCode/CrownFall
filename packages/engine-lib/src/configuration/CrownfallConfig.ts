@@ -6,6 +6,10 @@ import {
 } from "@openfront/engine-api/game/GameTypes";
 import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { pow } from "../DetMath";
+import {
+  type CrownfallPathModifiers,
+  NEUTRAL_PATH_MODIFIERS,
+} from "./CrownfallPaths";
 
 /**
  * Crownfall national management constants & deterministic rules.
@@ -32,10 +36,12 @@ export const CROWNFALL_CONFIG = {
   tilePopCapScale: 450,
   tilePopCapExponent: 0.65,
 
+  /** Baseline academic science per second for every alive nation. */
+  baseSciencePerSec: 2,
   /** Base science generated per second per Research Centre level. */
   researchCentreSciencePerSec: 12,
-  /** Passive science per second from every 100k civilian population. */
-  civilianSciencePer100k: 1,
+  /** Passive science per second from every 25k civilian population. */
+  civilianScienceDivisor: 25_000,
 
   /** Stability target contributors. */
   baseStabilityTarget: 70,
@@ -67,6 +73,17 @@ export const CROWNFALL_CONFIG = {
       growthPercent: 85,
     },
   },
+
+  /** Phase 7: Stable Hegemony Victory rules. */
+  hegemony: {
+    enabled: true,
+    /** Seconds a leading nation/team must hold territory + stability >= minStability. */
+    holdSeconds: 90,
+    /** Minimum stability (0-100) required to advance Stable Hegemony. */
+    minStability: 50,
+    /** Seconds lost per second when stability drops below minStability or territory slips. */
+    decayPerSecond: 2,
+  },
 } as const;
 
 export type StabilityBand = "stable" | "unrest" | "crisis" | "rebellion";
@@ -78,6 +95,7 @@ export interface StabilityBreakdown {
   housing: number;
   warStrain: number;
   overexpansion: number;
+  development: number;
   target: number;
 }
 
@@ -120,6 +138,7 @@ export function computeStabilityBreakdown(
   taxRate: TaxRate,
   civilianPop: number,
   activeIncomingAttacks: number,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
 ): StabilityBreakdown {
   const base = CROWNFALL_CONFIG.baseStabilityTarget;
   const tax = CROWNFALL_CONFIG.tax[taxRate].stabilityDelta;
@@ -136,7 +155,10 @@ export function computeStabilityBreakdown(
   const cap = Math.max(1, maxCivilianPopulation(player));
   const housingRatioPercent = Math.floor((civilianPop * 100) / cap);
   let housing = 0;
-  if (housingRatioPercent <= 80 && completedStructureLevels(player, UnitType.Housing) > 0) {
+  if (
+    housingRatioPercent <= 80 &&
+    completedStructureLevels(player, UnitType.Housing) > 0
+  ) {
     housing = CROWNFALL_CONFIG.housingSurplusBonus;
   } else if (housingRatioPercent >= 95) {
     housing = CROWNFALL_CONFIG.housingOvercrowdedPenalty;
@@ -151,13 +173,23 @@ export function computeStabilityBreakdown(
     0,
     player.numTilesOwned() - CROWNFALL_CONFIG.overexpansionFreeTiles,
   );
-  const overexpansion = -Math.min(
+  const rawOverexpansion = Math.min(
     -CROWNFALL_CONFIG.overexpansionStrainMax,
     Math.floor(excessTiles / CROWNFALL_CONFIG.overexpansionTilesPerPoint),
   );
+  const overexpansion = -Math.floor(
+    (rawOverexpansion * mods.overexpansionStrainPercent) / 100,
+  );
+  const development = mods.stabilityTargetDelta;
 
   const rawTarget =
-    base + tax + publicServices + housing + warStrain + overexpansion;
+    base +
+    tax +
+    publicServices +
+    housing +
+    warStrain +
+    overexpansion +
+    development;
   const minFloor =
     player.type() === PlayerType.Human
       ? CROWNFALL_CONFIG.minStability
@@ -174,6 +206,7 @@ export function computeStabilityBreakdown(
     housing,
     warStrain,
     overexpansion,
+    development,
     target,
   };
 }
@@ -183,6 +216,7 @@ export function civilianGrowthPerSecond(
   currentPop: number,
   stability: number,
   taxRate: TaxRate,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
 ): number {
   const cap = maxCivilianPopulation(player);
   if (currentPop >= cap) {
@@ -194,7 +228,9 @@ export function civilianGrowthPerSecond(
   const taxMult = CROWNFALL_CONFIG.tax[taxRate].growthPercent;
   // Stability scales growth: 100 stability = 120%, 50 = 100%, 0 = 60%
   const stabMult = 60 + Math.floor((stability * 60) / 100);
-  const delta = Math.floor((baseGrowth * taxMult * stabMult) / 10_000);
+  const delta = Math.floor(
+    (baseGrowth * taxMult * stabMult * mods.civilianGrowthPercent) / 1_000_000,
+  );
   return Math.min(headroom, Math.max(0, delta));
 }
 
@@ -204,6 +240,7 @@ export function civilianTaxGoldPerSecond(
   stability: number,
   taxRate: TaxRate,
   goldMultiplier: number = 1,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
 ): Gold {
   if (player.type() === PlayerType.Bot) {
     return 0n;
@@ -215,7 +252,9 @@ export function civilianTaxGoldPerSecond(
   const stabEfficiency =
     stability >= 60 ? 100 : 50 + Math.floor((stability * 50) / 60);
   const raw = Math.floor(
-    ((baseGold * taxMult * stabEfficiency) / 10_000) * goldMultiplier,
+    ((baseGold * taxMult * stabEfficiency * mods.civilianTaxPercent) /
+      1_000_000) *
+      goldMultiplier,
   );
   return BigInt(Math.max(0, raw));
 }
@@ -224,6 +263,7 @@ export function sciencePerSecond(
   player: PlayerLike,
   civilianPop: number,
   stability: number,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
 ): number {
   const researchLevels = completedStructureLevels(
     player,
@@ -232,12 +272,15 @@ export function sciencePerSecond(
   const fromCentres =
     researchLevels * CROWNFALL_CONFIG.researchCentreSciencePerSec;
   const fromPop = Math.floor(
-    (civilianPop * CROWNFALL_CONFIG.civilianSciencePer100k) / 100_000,
+    civilianPop / CROWNFALL_CONFIG.civilianScienceDivisor,
   );
-  const raw = fromCentres + fromPop;
+  const raw = CROWNFALL_CONFIG.baseSciencePerSec + fromCentres + fromPop;
   if (raw <= 0) return 0;
   // Unrest slows research slightly (70% at 0 stability, 100% at >= 60)
   const stabEfficiency =
     stability >= 60 ? 100 : 70 + Math.floor((stability * 30) / 60);
-  return Math.max(0, Math.floor((raw * stabEfficiency) / 100));
+  return Math.max(
+    1,
+    Math.floor((raw * stabEfficiency * mods.scienceRatePercent) / 10_000),
+  );
 }

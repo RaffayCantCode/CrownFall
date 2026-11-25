@@ -1,11 +1,15 @@
 import { AllPlayersStats, ClientID, Winner } from "../Schemas";
 import { TileRef } from "./GameMap";
 import {
+  AllianceActionType,
+  AugmentId,
+  DevelopmentPath,
   EmojiMessage,
   GameUpdates,
   Gold,
   MessageType,
   NameViewData,
+  NationalProject,
   NukeState,
   PlayerID,
   PlayerType,
@@ -125,6 +129,10 @@ export enum GameUpdateType {
   SpawnPhaseEnd,
   GamePaused,
   DonateEvent,
+  AugmentDraft,
+  AllianceActionRequest,
+  AllianceActionReply,
+  Hegemony,
 }
 
 export type GameUpdate =
@@ -150,7 +158,56 @@ export type GameUpdate =
   | EmbargoUpdate
   | SpawnPhaseEndUpdate
   | GamePausedUpdate
-  | DonateEventUpdate;
+  | DonateEventUpdate
+  | AugmentDraftUpdate
+  | AllianceActionRequestUpdate
+  | AllianceActionReplyUpdate
+  | HegemonyUpdate;
+
+export interface HegemonyUpdate {
+  type: GameUpdateType.Hegemony;
+  active: boolean;
+  holderPlayerID: number | null;
+  holderTeam: Team | null;
+  holderName: string;
+  heldSeconds: number;
+  requiredSeconds: number;
+  stability: number;
+  minStability: number;
+  stalled: boolean;
+  decaying: boolean;
+}
+
+export interface AllianceActionRequestUpdate {
+  type: GameUpdateType.AllianceActionRequest;
+  requestID: number;
+  requestorID: number;
+  recipientID: number;
+  actionType: AllianceActionType;
+  targetID: number | null;
+  createdAt: Tick;
+  expiresAt: Tick;
+}
+
+export interface AllianceActionReplyUpdate {
+  type: GameUpdateType.AllianceActionReply;
+  requestID: number;
+  requestorID: number;
+  recipientID: number;
+  actionType: AllianceActionType;
+  accepted: boolean;
+}
+
+export interface AugmentDraftUpdate {
+  type: GameUpdateType.AugmentDraft;
+  draftKind: "path" | "augment";
+  active: boolean;
+  round: number;
+  totalRounds: number;
+  pickedCount: number;
+  totalCount: number;
+  ticksRemaining: number;
+}
 
 export interface BonusEventUpdate {
   type: GameUpdateType.BonusEvent;
@@ -293,7 +350,19 @@ export interface PlayerUpdate {
   civilianPopulation?: number;
   science?: number;
   stability?: number;
+  rebellionMeter?: number;
+  activeProject?: NationalProject | null;
+  activeProjectExpiresTick?: number;
+  projectCooldownUntilTick?: number;
   taxRate?: TaxRate;
+  /** Crownfall national development path progression. */
+  primaryPath?: DevelopmentPath | null;
+  militaryLevel?: number;
+  politicalLevel?: number;
+  scientificLevel?: number;
+  /** Crownfall national augments (hard cap: 5 per player per match). */
+  selectedAugments?: AugmentId[];
+  pendingAugmentChoices?: AugmentId[];
 }
 
 export interface AllianceView {

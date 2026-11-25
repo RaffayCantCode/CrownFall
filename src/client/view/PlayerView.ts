@@ -1,10 +1,13 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  AugmentId,
   BuildableUnit,
   Cell,
+  DevelopmentPath,
   EmojiMessage,
   Gold,
   NameViewData,
+  NationalProject,
   PlayerActions,
   PlayerBorderTiles,
   PlayerBuildableUnitType,
@@ -23,7 +26,14 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { ClientID } from "@openfront/engine-api/Schemas";
+import { applyAugmentModifiers } from "@openfront/engine-lib/configuration/CrownfallAugments";
 import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import { applyActiveProjectModifiers } from "@openfront/engine-lib/configuration/CrownfallProjects";
+import {
+  computeCrownfallPathModifiers,
+  type CrownfallPathModifiers,
+  type PathProgress,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
 import { PatternDecoder } from "@openfront/shared/PatternDecoder";
 import { createRandomName } from "@openfront/shared/SharedUtil";
 import { PlayerCosmetics } from "@openfront/shared/WireSchemas";
@@ -511,8 +521,63 @@ export class PlayerView implements PlayerLike {
     return this.state.stability ?? CROWNFALL_CONFIG.startingStability;
   }
 
+  rebellionMeter(): number {
+    return this.state.rebellionMeter ?? 0;
+  }
+
   taxRate(): TaxRate {
     return (this.state.taxRate as TaxRate | undefined) ?? TaxRate.Normal;
+  }
+
+  primaryPath(): DevelopmentPath | null {
+    return (this.state.primaryPath as DevelopmentPath | null | undefined) ?? null;
+  }
+
+  pathProgress(): PathProgress {
+    return {
+      primaryPath: this.primaryPath(),
+      militaryLevel: this.state.militaryLevel ?? 0,
+      politicalLevel: this.state.politicalLevel ?? 0,
+      scientificLevel: this.state.scientificLevel ?? 0,
+    };
+  }
+
+  selectedAugments(): readonly AugmentId[] {
+    return (this.state.selectedAugments as AugmentId[] | undefined) ?? [];
+  }
+
+  pendingAugmentChoices(): readonly AugmentId[] {
+    return (this.state.pendingAugmentChoices as AugmentId[] | undefined) ?? [];
+  }
+
+  activeProject(): NationalProject | null {
+    const proj =
+      (this.state.activeProject as NationalProject | null | undefined) ?? null;
+    if (
+      proj !== null &&
+      this.game.ticks() >= (this.state.activeProjectExpiresTick ?? 0)
+    ) {
+      return null;
+    }
+    return proj;
+  }
+
+  activeProjectExpiresTick(): number {
+    return this.state.activeProjectExpiresTick ?? 0;
+  }
+
+  projectCooldownUntilTick(): number {
+    return this.state.projectCooldownUntilTick ?? 0;
+  }
+
+  pathModifiers(): CrownfallPathModifiers {
+    return applyActiveProjectModifiers(
+      applyAugmentModifiers(
+        computeCrownfallPathModifiers(this.pathProgress()),
+        this.selectedAugments(),
+      ),
+      this.activeProject(),
+    );
   }
 
   isAlliedWith(other: PlayerView): boolean {

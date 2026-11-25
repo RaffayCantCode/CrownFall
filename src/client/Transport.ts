@@ -1,8 +1,12 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  AllianceActionType,
   AllPlayers,
+  AugmentId,
+  DevelopmentPath,
   GameType,
   Gold,
+  NationalProject,
   PlayerID,
   TaxRate,
   Tick,
@@ -70,6 +74,37 @@ export class PauseGameIntentEvent implements GameEvent {
 
 export class SendSetTaxRateIntentEvent implements GameEvent {
   constructor(public readonly taxRate: TaxRate) {}
+}
+
+export class SendSelectDevPathIntentEvent implements GameEvent {
+  constructor(public readonly path: DevelopmentPath) {}
+}
+
+export class SendUnlockDevTierIntentEvent implements GameEvent {
+  constructor(public readonly path: DevelopmentPath) {}
+}
+
+export class SendSelectAugmentIntentEvent implements GameEvent {
+  constructor(public readonly augmentId: AugmentId) {}
+}
+
+export class SendAllianceActionRequestIntentEvent implements GameEvent {
+  constructor(
+    public readonly recipientID: PlayerID,
+    public readonly actionType: AllianceActionType,
+    public readonly targetID: PlayerID | null,
+  ) {}
+}
+
+export class SendAllianceActionReplyIntentEvent implements GameEvent {
+  constructor(
+    public readonly requestID: number,
+    public readonly accept: boolean,
+  ) {}
+}
+
+export class SendActivateNationalProjectIntentEvent implements GameEvent {
+  constructor(public readonly project: NationalProject) {}
 }
 
 export class SendAllianceRequestIntentEvent implements GameEvent {
@@ -359,6 +394,24 @@ export class Transport {
     this.subscribe(PauseGameIntentEvent, (e) => this.onPauseGameIntent(e));
     this.subscribe(SendSetTaxRateIntentEvent, (e) =>
       this.onSetTaxRateIntent(e),
+    );
+    this.subscribe(SendSelectDevPathIntentEvent, (e) =>
+      this.onSelectDevPathIntent(e),
+    );
+    this.subscribe(SendUnlockDevTierIntentEvent, (e) =>
+      this.onUnlockDevTierIntent(e),
+    );
+    this.subscribe(SendSelectAugmentIntentEvent, (e) =>
+      this.onSelectAugmentIntent(e),
+    );
+    this.subscribe(SendAllianceActionRequestIntentEvent, (e) =>
+      this.onAllianceActionRequestIntent(e),
+    );
+    this.subscribe(SendAllianceActionReplyIntentEvent, (e) =>
+      this.onAllianceActionReplyIntent(e),
+    );
+    this.subscribe(SendActivateNationalProjectIntentEvent, (e) =>
+      this.onActivateNationalProjectIntent(e),
     );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
@@ -1032,6 +1085,57 @@ export class Transport {
     this.sendIntent({
       type: "set_tax_rate",
       taxRate: event.taxRate,
+    });
+  }
+
+  private onSelectDevPathIntent(event: SendSelectDevPathIntentEvent) {
+    this.sendIntent({
+      type: "select_dev_path",
+      path: event.path,
+    });
+  }
+
+  private onUnlockDevTierIntent(event: SendUnlockDevTierIntentEvent) {
+    this.sendIntent({
+      type: "unlock_dev_tier",
+      path: event.path,
+    });
+  }
+
+  private onSelectAugmentIntent(event: SendSelectAugmentIntentEvent) {
+    this.sendIntent({
+      type: "select_augment",
+      augmentId: event.augmentId,
+    });
+  }
+
+  private onAllianceActionRequestIntent(
+    event: SendAllianceActionRequestIntentEvent,
+  ) {
+    this.sendIntent({
+      type: "alliance_action_request",
+      recipientID: event.recipientID,
+      actionType: event.actionType,
+      targetID: event.targetID,
+    });
+  }
+
+  private onAllianceActionReplyIntent(
+    event: SendAllianceActionReplyIntentEvent,
+  ) {
+    this.sendIntent({
+      type: "alliance_action_reply",
+      requestID: event.requestID,
+      accept: event.accept,
+    });
+  }
+
+  private onActivateNationalProjectIntent(
+    event: SendActivateNationalProjectIntentEvent,
+  ) {
+    this.sendIntent({
+      type: "activate_national_project",
+      project: event.project,
     });
   }
 

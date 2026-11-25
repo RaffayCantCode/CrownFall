@@ -196,7 +196,16 @@ describe.each(VARIANTS)("full game snapshots: %s", (_, overrides) => {
       if (Object.keys(overrides).length > 0) return; // checked once, on FFA
       // Single-tick / spawn-phase executions that finish immediately and are
       // covered directly by BasicExecutions.test.ts / CrownfallPhase1.test.ts.
-      const neverStored = new Set(["Pause", "SetTaxRate"]);
+      const neverStored = new Set([
+        "Pause",
+        "SetTaxRate",
+        "SelectDevPath",
+        "UnlockDevTier",
+        "SelectAugment",
+        "AllianceActionRequest",
+        "AllianceActionReply",
+        "ActivateNationalProject",
+      ]);
       const missing = EXECUTION_SNAPSHOT_TYPES.map((t) => t.name).filter(
         (name) => !reference.execTypes.has(name) && !neverStored.has(name),
       );

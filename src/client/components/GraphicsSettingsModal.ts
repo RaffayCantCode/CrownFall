@@ -7,6 +7,7 @@ import { BaseModal } from "./BaseModal";
 import "./GraphicsAdvancedSettings";
 import "./GraphicsPresetSelector";
 import "./GraphicsPresetTools";
+import { hudCustomizationSettings } from "./ui/HudCustomizationSettings";
 import { hudOpacitySetting } from "./ui/HudOpacitySetting";
 
 /** Reuses the shared controls and storage while leaving the map visible. */
@@ -55,6 +56,9 @@ export class GraphicsSettingsModal extends BaseModal {
     if (!this.isOpen()) return html``;
     return html`
       <div class="graphics-settings-panel flex flex-col px-4 pb-4">
+        ${hudCustomizationSettings(this.userSettings, () =>
+          this.requestUpdate(),
+        )}
         ${hudOpacitySetting(this.userSettings)}
         <graphics-advanced-settings
           class="flex flex-col"

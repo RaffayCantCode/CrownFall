@@ -3,6 +3,7 @@ import { GameMode, GameType, Gold } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import { ClientID } from "@openfront/engine-api/Schemas";
 import { Config } from "@openfront/engine-lib/configuration/Config";
+import { crisisTroopRegenPercent } from "@openfront/engine-lib/configuration/CrownfallCrises";
 import { renderNumber, renderTroops } from "@openfront/engine-lib/Format";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import {
@@ -16,7 +17,12 @@ import { keyed } from "lit/directives/keyed.js";
 import { Controller } from "../../Controller";
 import { AttackRatioEvent, isForwardedClick } from "../../InputHandler";
 import { UIState } from "../../UIState";
-import { USER_SETTINGS_CHANGED_EVENT, UserSettings } from "../../UserSettings";
+import {
+  HUD_POSITION_KEY,
+  type HudPosition,
+  USER_SETTINGS_CHANGED_EVENT,
+  UserSettings,
+} from "../../UserSettings";
 import { getGamesPlayed, translateText } from "../../Utils";
 import { GameView } from "../../view";
 import { PlayerView } from "../../view/PlayerView";
@@ -46,6 +52,9 @@ export class ControlPanel extends LitElement implements Controller {
 
   @state()
   private _isVisible = false;
+
+  @state()
+  private _hudPosition: HudPosition = new UserSettings().hudPosition();
 
   @state()
   private _notification: { type: "warning" | "info"; message: string } | null =
@@ -113,6 +122,10 @@ export class ControlPanel extends LitElement implements Controller {
       `${USER_SETTINGS_CHANGED_EVENT}:settings.attackRatio`,
       this.onAttackRatioSettingChanged,
     );
+    globalThis.addEventListener(
+      `${USER_SETTINGS_CHANGED_EVENT}:${HUD_POSITION_KEY}`,
+      this.onHudPositionChanged,
+    );
   }
 
   init(): () => void {
@@ -173,7 +186,11 @@ export class ControlPanel extends LitElement implements Controller {
       .outgoingAttacks()
       .map((a) => a.troops)
       .reduce((a, b) => a + b, 0);
-    this.troopRate = config.troopIncreaseRate(player) * 10;
+    const baseRate = config.troopIncreaseRate(player) * 10;
+    const pathMods = player.pathModifiers();
+    const crisisRegen = crisisTroopRegenPercent(player.stability());
+    const combinedRegenPercent = (pathMods.troopRegenPercent * crisisRegen) / 100;
+    this.troopRate = (baseRate * combinedRegenPercent) / 100;
 
     const helpEnabled = new UserSettings().helpMessages();
 
@@ -358,6 +375,10 @@ export class ControlPanel extends LitElement implements Controller {
       `${USER_SETTINGS_CHANGED_EVENT}:settings.attackRatio`,
       this.onAttackRatioSettingChanged,
     );
+    globalThis.removeEventListener(
+      `${USER_SETTINGS_CHANGED_EVENT}:${HUD_POSITION_KEY}`,
+      this.onHudPositionChanged,
+    );
     if (this._goldGainTimeoutId !== null) {
       clearTimeout(this._goldGainTimeoutId);
       this._goldGainTimeoutId = null;
@@ -385,6 +406,11 @@ export class ControlPanel extends LitElement implements Controller {
     if (this.uiState === undefined) return;
     this.attackRatio = new UserSettings().attackRatio();
     this.onAttackRatioChange(this.attackRatio);
+    this.requestUpdate();
+  };
+
+  private onHudPositionChanged = () => {
+    this._hudPosition = new UserSettings().hudPosition();
     this.requestUpdate();
   };
 
@@ -615,103 +641,229 @@ export class ControlPanel extends LitElement implements Controller {
   }
 
   private renderDesktop() {
+    const isSideRail =
+      this._hudPosition === "left" || this._hudPosition === "right";
+
+    if (isSideRail) {
+      return html`
+        ${this.renderNotification()}
+        <!-- Bespoke Vertical Side-Rail Empire Vitals + Attack Control -->
+        <div class="flex flex-col gap-2 px-2.5 pt-2.5 pb-1.5 w-full min-w-0">
+          <!-- Row 1: Full-width Troop Bar -->
+          <div class="w-full min-w-0 ${this.tutorialHighlightClass("troops")}">
+            ${this.renderDesktopTroopBar()}
+          </div>
+
+          <!-- Row 2: Regen Rate & Gold side-by-side -->
+          <div class="grid grid-cols-2 gap-2 w-full min-w-0">
+            <div
+              class="flex items-center justify-center gap-1.5 border rounded-lg bg-[#0e131d] font-bold text-sm py-1 px-2 ${this.tutorialHighlightClass(
+                "troop_rate",
+              )} ${
+                this._troopRateIsIncreasing
+                  ? "border-emerald-400/45"
+                  : "border-amber-400/50"
+              }"
+              translate="no"
+            >
+              <img
+                src=${soldierIcon}
+                alt=""
+                aria-hidden="true"
+                width="14"
+                height="14"
+                class="shrink-0"
+                style="filter: ${
+                  this._troopRateIsIncreasing
+                    ? "brightness(0) saturate(100%) invert(74%) sepia(44%) saturate(500%) hue-rotate(83deg) brightness(103%)"
+                    : "brightness(0) saturate(100%) invert(65%) sepia(60%) saturate(600%) hue-rotate(330deg) brightness(105%)"
+                }"
+              />
+              <span
+                class="text-sm font-bold tabular-nums ${
+                  this._troopRateIsIncreasing
+                    ? "text-emerald-400"
+                    : "text-amber-300"
+                }"
+                >+${renderTroops(this.troopRate)}/s</span
+              >
+            </div>
+
+            <div
+              class="flex items-center justify-center gap-1.5 border rounded-lg bg-[#0e131d] border-[#d4af37]/55 font-bold text-[#f3d27a] text-sm py-1 px-2 relative ${this.tutorialHighlightClass(
+                "gold",
+              )}"
+              translate="no"
+            >
+              ${
+                this._goldGain !== null
+                  ? keyed(
+                      this._goldGainPulseId,
+                      html`<span
+                        class="gold-gain-pop absolute -top-5 right-[5px] text-emerald-400 text-xs font-extrabold tabular-nums whitespace-nowrap pointer-events-none drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]"
+                        >+${renderNumber(this._goldGain)}</span
+                      >`,
+                    )
+                  : ""
+              }
+              <img src=${goldCoinIcon} width="14" height="14" class="shrink-0" />
+              <span class="tabular-nums">${renderNumber(this._gold)}</span>
+            </div>
+          </div>
+
+          <!-- Row 3: Attack Ratio Stacked Header + Bounded Slider -->
+          <div
+            class="flex flex-col gap-1.5 w-full min-w-0 border border-white/10 rounded-lg bg-[#0e131d] px-2.5 py-1.5 ${this.tutorialHighlightClass(
+              "attack_ratio",
+            )}"
+            translate="no"
+          >
+            <div class="flex items-center justify-between text-xs font-bold text-[#f4f1ea]">
+              <div class="flex items-center gap-1.5">
+                <img
+                  src=${swordIcon}
+                  alt=""
+                  aria-hidden="true"
+                  width="12"
+                  height="12"
+                  style="filter: brightness(0) invert(1);"
+                />
+                <span class="uppercase tracking-wider text-slate-400 text-[10px]">
+                  Attack Ratio
+                </span>
+              </div>
+              <span class="tabular-nums text-sm"
+                >${(this.attackRatio * 100).toFixed(0)}%
+                <span class="text-[#9aa3b2] font-medium"
+                  >(${renderTroops(
+                    (this.game?.myPlayer()?.troops() ?? 0) * this.attackRatio,
+                  )})</span
+                ></span
+              >
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              .value=${String(Math.round(this.attackRatio * 100))}
+              @input=${(e: Event) => this.handleRatioSliderInput(e)}
+              @pointerup=${(e: Event) => this.handleRatioSliderPointerUp(e)}
+              @click=${(e: MouseEvent) => this.handleRatioSliderClick(e)}
+              data-radial-click-through
+              class="w-full min-w-0 h-2 accent-[#d4af37] cursor-pointer"
+            />
+          </div>
+        </div>
+      `;
+    }
+
     return html`
       ${this.renderNotification()}
-      <!-- Row 1: troop rate | troop bar | gold -->
-      <div class="flex gap-1.5 items-center mb-1">
-        <!-- Troop rate -->
-        <div
-          class="flex items-center gap-1 shrink-0 border rounded-md font-bold text-sm py-0.5 px-1 w-[5.5rem] ${this.tutorialHighlightClass(
-            "troop_rate",
-          )} ${
-            this._troopRateIsIncreasing
-              ? "border-green-400"
-              : "border-orange-400"
-          }"
-          translate="no"
-        >
-          <img
-            src=${soldierIcon}
-            alt=""
-            aria-hidden="true"
-            width="13"
-            height="13"
-            class="shrink-0"
-            style="filter: ${
+      <!-- Clean, spacious 2-row bounded Empire Vitals + Attack Control (never overflows) -->
+      <div class="flex flex-col gap-2 px-2 pt-1.5 pb-1 w-full min-w-0">
+        <!-- Row 1: Troop Rate | Troop Progress Bar | Gold -->
+        <div class="flex items-center gap-2 w-full min-w-0">
+          <!-- Troop rate -->
+          <div
+            class="flex items-center gap-1.5 shrink-0 border rounded-lg bg-[#0e131d] font-bold text-sm py-1 px-2.5 min-w-[5.75rem] ${this.tutorialHighlightClass(
+              "troop_rate",
+            )} ${
               this._troopRateIsIncreasing
-                ? "brightness(0) saturate(100%) invert(74%) sepia(44%) saturate(500%) hue-rotate(83deg) brightness(103%)"
-                : "brightness(0) saturate(100%) invert(65%) sepia(60%) saturate(600%) hue-rotate(330deg) brightness(105%)"
+                ? "border-emerald-400/45"
+                : "border-amber-400/50"
             }"
-          />
-          <span
-            class="text-sm font-bold tabular-nums ${
-              this._troopRateIsIncreasing ? "text-green-400" : "text-orange-400"
-            }"
-            >+${renderTroops(this.troopRate)}/s</span
+            translate="no"
           >
+            <img
+              src=${soldierIcon}
+              alt=""
+              aria-hidden="true"
+              width="14"
+              height="14"
+              class="shrink-0"
+              style="filter: ${
+                this._troopRateIsIncreasing
+                  ? "brightness(0) saturate(100%) invert(74%) sepia(44%) saturate(500%) hue-rotate(83deg) brightness(103%)"
+                  : "brightness(0) saturate(100%) invert(65%) sepia(60%) saturate(600%) hue-rotate(330deg) brightness(105%)"
+              }"
+            />
+            <span
+              class="text-sm font-bold tabular-nums ${
+                this._troopRateIsIncreasing
+                  ? "text-emerald-400"
+                  : "text-amber-300"
+              }"
+              >+${renderTroops(this.troopRate)}/s</span
+            >
+          </div>
+
+          <!-- Troop bar -->
+          <div class="flex-1 min-w-0 ${this.tutorialHighlightClass("troops")}">
+            ${this.renderDesktopTroopBar()}
+          </div>
+
+          <!-- Gold -->
+          <div
+            class="flex items-center gap-1.5 shrink-0 border rounded-lg bg-[#0e131d] border-[#d4af37]/55 font-bold text-[#f3d27a] text-sm py-1 px-3 min-w-[5.25rem] relative ${this.tutorialHighlightClass(
+              "gold",
+            )}"
+            translate="no"
+          >
+            ${
+              this._goldGain !== null
+                ? keyed(
+                    this._goldGainPulseId,
+                    html`<span
+                      class="gold-gain-pop absolute -top-5 right-[5px] text-emerald-400 text-xs font-extrabold tabular-nums whitespace-nowrap pointer-events-none drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]"
+                      >+${renderNumber(this._goldGain)}</span
+                    >`,
+                  )
+                : ""
+            }
+            <img src=${goldCoinIcon} width="14" height="14" class="shrink-0" />
+            <span class="tabular-nums">${renderNumber(this._gold)}</span>
+          </div>
         </div>
-        <!-- Troop bar -->
-        <div class="flex-1 ${this.tutorialHighlightClass("troops")}">
-          ${this.renderDesktopTroopBar()}
-        </div>
-        <!-- Gold -->
+
+        <!-- Row 2: Attack Ratio Readout + Full-Width Bounded Slider -->
         <div
-          class="flex items-center gap-1 shrink-0 border rounded-md border-yellow-400 font-bold text-yellow-400 text-sm py-0.5 px-1 min-w-[4.5rem] relative ${this.tutorialHighlightClass(
-            "gold",
+          class="flex items-center gap-3 w-full min-w-0 border border-white/10 rounded-lg bg-[#0e131d] px-3 py-1.5 ${this.tutorialHighlightClass(
+            "attack_ratio",
           )}"
           translate="no"
         >
-          ${
-            this._goldGain !== null
-              ? keyed(
-                  this._goldGainPulseId,
-                  html`<span
-                    class="gold-gain-pop absolute -top-5 right-[5px] min-[1015px]:right-[9px] text-green-400 text-sm font-extrabold tabular-nums whitespace-nowrap pointer-events-none drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]"
-                    >+${renderNumber(this._goldGain)}</span
-                  >`,
-                )
-              : ""
-          }
-          <img src=${goldCoinIcon} width="13" height="13" class="shrink-0" />
-          <span class="tabular-nums">${renderNumber(this._gold)}</span>
-        </div>
-      </div>
-      <!-- Row 2: attack ratio | slider -->
-      <div
-        class="flex items-center gap-1.5 ${this.tutorialHighlightClass(
-          "attack_ratio",
-        )}"
-        translate="no"
-      >
-        <div
-          class="flex items-center gap-1 shrink-0 border border-gray-600 rounded-md px-1 py-0.5 text-sm font-bold text-white cursor-pointer w-[8rem]"
-        >
-          <img
-            src=${swordIcon}
-            alt=""
-            aria-hidden="true"
-            width="12"
-            height="12"
-            style="filter: brightness(0) invert(1);"
-          />
-          <span
-            >${(this.attackRatio * 100).toFixed(0)}%
-            (${renderTroops(
-              (this.game?.myPlayer()?.troops() ?? 0) * this.attackRatio,
-            )})</span
+          <div
+            class="flex items-center gap-1.5 shrink-0 text-sm font-bold text-[#f4f1ea] min-w-[8.25rem]"
           >
+            <img
+              src=${swordIcon}
+              alt=""
+              aria-hidden="true"
+              width="13"
+              height="13"
+              style="filter: brightness(0) invert(1);"
+            />
+            <span class="tabular-nums"
+              >${(this.attackRatio * 100).toFixed(0)}%
+              <span class="text-[#9aa3b2] font-medium"
+                >(${renderTroops(
+                  (this.game?.myPlayer()?.troops() ?? 0) * this.attackRatio,
+                )})</span
+              ></span
+            >
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            .value=${String(Math.round(this.attackRatio * 100))}
+            @input=${(e: Event) => this.handleRatioSliderInput(e)}
+            @pointerup=${(e: Event) => this.handleRatioSliderPointerUp(e)}
+            @click=${(e: MouseEvent) => this.handleRatioSliderClick(e)}
+            data-radial-click-through
+            class="flex-1 min-w-0 w-full h-2 accent-[#d4af37] cursor-pointer"
+          />
         </div>
-        <input
-          type="range"
-          min="1"
-          max="100"
-          .value=${String(Math.round(this.attackRatio * 100))}
-          @input=${(e: Event) => this.handleRatioSliderInput(e)}
-          @pointerup=${(e: Event) => this.handleRatioSliderPointerUp(e)}
-          @click=${(e: MouseEvent) => this.handleRatioSliderClick(e)}
-          data-radial-click-through
-          class="flex-1 h-1.5 accent-aquarius cursor-pointer"
-        />
       </div>
     `;
   }

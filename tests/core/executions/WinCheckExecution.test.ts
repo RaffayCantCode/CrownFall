@@ -95,6 +95,7 @@ describe("WinCheckExecution - Nation Winners", () => {
       infiniteGold: true,
       gameMode: GameMode.FFA,
       instantBuild: true,
+      stableHegemony: { enabled: false },
     });
 
     // Create Nation player
@@ -218,6 +219,7 @@ describe("WinCheckExecution - Nation Winners", () => {
       infiniteGold: true,
       gameMode: GameMode.FFA,
       instantBuild: true,
+      stableHegemony: { enabled: false },
     });
 
     // Create 3 Nation players

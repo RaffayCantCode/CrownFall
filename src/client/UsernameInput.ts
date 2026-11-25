@@ -1368,4 +1368,40 @@ export class UsernameInput extends LitElement {
       this._isValid && this.clanTagOwnershipError !== "username.tag_not_member"
     );
   }
+
+  /** Returns the player's custom name, or empty string if currently using an auto-generated random name. */
+  public getCustomChosenUsername(): string {
+    return this.usernameIsGenerated ? "" : this.baseUsername;
+  }
+
+  /**
+   * Crownfall menu helper: if `raw` is blank, assigns a fresh random name so
+   * leaving the name box empty never blocks play. Otherwise stores the custom name.
+   */
+  public setCustomOrRandomName(raw: string): string {
+    const cleaned = raw.replace(/[[\]]/g, "");
+    this.verifiedActive = false;
+    if (cleaned.trim().length === 0) {
+      const randName = genAnonUsername();
+      this.baseUsername = randName;
+      this.usernameIsGenerated = true;
+      this.validateAndStore();
+      return "";
+    }
+    const clamped = clampUsername(cleaned);
+    this.baseUsername = clamped;
+    this.usernameIsGenerated = false;
+    this.validateAndStore();
+    return clamped;
+  }
+
+  /** Rolls a visible random name into the custom input field. */
+  public rollVisibleRandomName(): string {
+    const randName = genAnonUsername();
+    this.verifiedActive = false;
+    this.baseUsername = randName;
+    this.usernameIsGenerated = false;
+    this.validateAndStore();
+    return randName;
+  }
 }

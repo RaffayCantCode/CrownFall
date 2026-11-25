@@ -73,6 +73,10 @@ export class TestConfig extends EngineConfig {
   attackLogic(_input: AttackLogicInput): AttackLogicResult {
     return { attackerTroopLoss: 1, defenderTroopLoss: 1, tickFraction: 1 };
   }
+
+  override enableOpeningPathDraft(): boolean {
+    return false;
+  }
 }
 export class UseRealAttackLogic extends TestConfig {
   attackLogic(input: AttackLogicInput): AttackLogicResult {

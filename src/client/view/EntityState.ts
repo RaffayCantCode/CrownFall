@@ -188,7 +188,17 @@ export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
     civilianPopulation: pu.civilianPopulation,
     science: pu.science,
     stability: pu.stability,
+    rebellionMeter: pu.rebellionMeter,
     taxRate: pu.taxRate,
+    primaryPath: pu.primaryPath,
+    militaryLevel: pu.militaryLevel,
+    politicalLevel: pu.politicalLevel,
+    scientificLevel: pu.scientificLevel,
+    selectedAugments: pu.selectedAugments?.slice(),
+    pendingAugmentChoices: pu.pendingAugmentChoices?.slice(),
+    activeProject: pu.activeProject,
+    activeProjectExpiresTick: pu.activeProjectExpiresTick,
+    projectCooldownUntilTick: pu.projectCooldownUntilTick,
   };
 }
 

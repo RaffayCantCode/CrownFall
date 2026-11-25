@@ -105,6 +105,13 @@ export function keysMayBeShared(a: string, b: string, key?: string): boolean {
 
 export const USER_SETTINGS_CHANGED_EVENT = "event:user-settings-changed";
 
+export type HudPosition = "bottom" | "left" | "right";
+export type HudScale = "compact" | "normal" | "large";
+
+export const HUD_POSITION_KEY = "settings.hudPosition";
+export const HUD_SCALE_KEY = "settings.hudScale";
+export const HUD_NOTIFICATION_DOTS_KEY = "settings.hudNotificationDots";
+
 // index.html reads this key directly to set the theme class before first paint.
 const HALLOWEEN_THEME_KEY = "settings.halloweenTheme";
 
@@ -443,6 +450,48 @@ export class UserSettings {
 
   setHudOpacity(value: number) {
     this.setFloat("settings.hudOpacity", value);
+  }
+
+  hudPosition(): HudPosition {
+    const raw = this.getCached(HUD_POSITION_KEY);
+    if (raw === "left" || raw === "right" || raw === "bottom") {
+      return raw;
+    }
+    return "bottom";
+  }
+
+  setHudPosition(pos: HudPosition) {
+    this.setString(HUD_POSITION_KEY, pos);
+    this.applyHudPreferences();
+  }
+
+  hudScale(): HudScale {
+    const raw = this.getCached(HUD_SCALE_KEY);
+    if (raw === "compact" || raw === "normal" || raw === "large") {
+      return raw;
+    }
+    return "normal";
+  }
+
+  setHudScale(scale: HudScale) {
+    this.setString(HUD_SCALE_KEY, scale);
+    this.applyHudPreferences();
+  }
+
+  hudNotificationDots(): boolean {
+    return this.getBool(HUD_NOTIFICATION_DOTS_KEY, true);
+  }
+
+  setHudNotificationDots(enabled: boolean) {
+    this.setBool(HUD_NOTIFICATION_DOTS_KEY, enabled);
+  }
+
+  applyHudPreferences(): void {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.dataset.hudPosition = this.hudPosition();
+    root.dataset.hudScale = this.hudScale();
+    root.style.setProperty("--hud-opacity", String(this.hudOpacity()));
   }
 
   performanceOverlay() {

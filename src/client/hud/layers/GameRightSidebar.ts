@@ -394,28 +394,36 @@ export class GameRightSidebar extends LitElement implements Controller {
         }
       </style>
       <aside
-        class=${`w-fit flex flex-row items-center gap-2 sm:gap-3 py-2 px-2 sm:px-3 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-bl-lg transition-transform duration-300 ease-out transform text-white ${shouldFlashSidebar ? "game-end-timer-sidebar-flash" : ""} ${
+        class=${`w-fit flex flex-row items-center gap-1.5 sm:gap-2 mt-2 mr-2 py-1.5 px-3 bg-[#080b12]/94 border border-[#d4af37]/30 backdrop-blur-md shadow-[0_12px_32px_rgba(0,0,0,0.75)] rounded-2xl transition-transform duration-300 ease-out transform text-[#f4f1ea] ${shouldFlashSidebar ? "game-end-timer-sidebar-flash" : ""} ${
           this._isVisible ? "translate-x-0" : "translate-x-full"
         }`}
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
         <!-- In-game time -->
-        <div data-game-timer class=${timerClass}>
+        <div
+          data-game-timer
+          class=${`font-mono text-xs sm:text-sm font-bold tracking-wider text-[#f3d27a] pr-2 border-r border-white/10 ${timerClass}`}
+        >
           ${this.secondsToHms(this.timer)}
         </div>
 
         <!-- Buttons -->
         ${this.maybeRenderReplayButtons()}
 
-        <div class="cursor-pointer" @click=${this.onSettingsButtonClick}>
-          <img src=${settingsIcon} alt="settings" width="20" height="20" />
-        </div>
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] hover:border-[#d4af37]/45 hover:bg-[#d4af37]/15 transition-all cursor-pointer p-0"
+          @click=${this.onSettingsButtonClick}
+          title="Settings"
+        >
+          <img src=${settingsIcon} alt="settings" width="16" height="16" />
+        </button>
 
         ${
           this.isShareable()
             ? html`<button
                 type="button"
-                class="cursor-pointer bg-transparent border-0 p-0 flex items-center justify-center text-white"
+                class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] hover:border-[#d4af37]/45 hover:bg-[#d4af37]/15 transition-all cursor-pointer p-0 text-white"
                 @mousedown=${(e: MouseEvent) => e.preventDefault()}
                 @click=${this.onShareButtonClick}
                 @keydown=${this.onShareButtonKeyDown}
@@ -427,16 +435,17 @@ export class GameRightSidebar extends LitElement implements Controller {
                   src=${shareIcon}
                   alt=""
                   aria-hidden="true"
-                  width="20"
-                  height="20"
+                  width="16"
+                  height="16"
                 />
               </button>`
             : ""
         }
         ${
           document.fullscreenEnabled && !this.hideFullscreenButton
-            ? html`<div
-                class="cursor-pointer"
+            ? html`<button
+                type="button"
+                class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] hover:border-[#d4af37]/45 hover:bg-[#d4af37]/15 transition-all cursor-pointer p-0"
                 @click=${this.onFullscreenButtonClick}
               >
                 <img
@@ -446,16 +455,21 @@ export class GameRightSidebar extends LitElement implements Controller {
                       ? translateText("fullscreen.exit")
                       : translateText("fullscreen.enter")
                   }
-                  width="20"
-                  height="20"
+                  width="16"
+                  height="16"
                 />
-              </div>`
+              </button>`
             : ""
         }
 
-        <div class="cursor-pointer" @click=${this.onExitButtonClick}>
-          <img src=${exitIcon} alt="exit" width="20" height="20" />
-        </div>
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] hover:border-rose-500/50 hover:bg-rose-500/20 transition-all cursor-pointer p-0"
+          @click=${this.onExitButtonClick}
+          title="Exit Match"
+        >
+          <img src=${exitIcon} alt="exit" width="16" height="16" />
+        </button>
       </aside>
       <doomsday-clock-panel
         .game=${this.game}
@@ -484,28 +498,42 @@ export class GameRightSidebar extends LitElement implements Controller {
       ${
         isReplayOrSingleplayer
           ? html`
-              <div class="cursor-pointer" @click=${this.toggleReplayPanel}>
+              <button
+                type="button"
+                class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] hover:border-[#d4af37]/45 hover:bg-[#d4af37]/15 transition-all cursor-pointer p-0"
+                @click=${this.toggleReplayPanel}
+                title="Game Speed"
+              >
                 <img
                   src=${FastForwardIconSolid}
                   alt="replay"
-                  width="20"
-                  height="20"
+                  width="16"
+                  height="16"
                 />
-              </div>
+              </button>
             `
           : ""
       }
       ${
         showPauseButton
           ? html`
-              <div class="cursor-pointer" @click=${this.onPauseButtonClick}>
+              <button
+                type="button"
+                class="flex h-7 w-7 items-center justify-center rounded-lg border ${
+                  this.isPaused
+                    ? "border-[#d4af37]/60 bg-[#d4af37]/20"
+                    : "border-transparent bg-white/[0.04] hover:border-[#d4af37]/45 hover:bg-[#d4af37]/15"
+                } transition-all cursor-pointer p-0"
+                @click=${this.onPauseButtonClick}
+                title=${this.isPaused ? "Resume" : "Pause"}
+              >
                 <img
                   src=${this.isPaused ? playIcon : pauseIcon}
                   alt="play/pause"
-                  width="20"
-                  height="20"
+                  width="16"
+                  height="16"
                 />
-              </div>
+              </button>
             `
           : ""
       }

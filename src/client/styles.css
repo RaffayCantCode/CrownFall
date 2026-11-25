@@ -33,12 +33,12 @@
   --color-limestone: #9ca3af;
 
   /* Background & decorative — Imperial Obsidian */
-  --color-deep-navy: #0b0e14;
+  --color-deep-navy: #07090d;
   --color-hex-cyan: #d4af37;
   --color-frame-orange: #dc2626;
 
   /* App-specific surface colors */
-  --color-surface: #111622;
+  --color-surface: #0f131b;
 
   --shadow-malibu-blue: 0 0 15px rgba(212, 175, 55, 0.22);
   --shadow-malibu-blue-soft: 0 0 12px rgba(212, 175, 55, 0.2);
@@ -315,8 +315,8 @@ body.page-open {
 }
 
 .option-card.selected {
-  border-color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
+  border-color: #d4af37;
+  background: rgba(212, 175, 55, 0.14);
 }
 
 .option-card.disabled {
@@ -902,4 +902,59 @@ unit-display .tutorial-highlight::after {
 .unit-display-more-left::before,
 .unit-display-more-right::after {
   opacity: 1;
+}
+
+/* ============================================================================
+ * Crownfall Phase 8: Customizable In-Game HUD Dock Positions & Scale
+ * ========================================================================== */
+#crownfall-hud-dock {
+  opacity: var(--hud-opacity, 1);
+  transform-origin: bottom center;
+  transition: transform 160ms ease-out;
+}
+
+html[data-hud-scale="compact"] #crownfall-hud-dock {
+  transform: scale(0.9);
+}
+
+html[data-hud-scale="large"] #crownfall-hud-dock {
+  transform: scale(1.08);
+}
+
+@media (min-width: 1024px) {
+  html[data-hud-position="left"] #crownfall-hud-dock-col {
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    width: 332px;
+    z-index: 210;
+  }
+
+  html[data-hud-position="left"] #crownfall-hud-dock {
+    border-radius: 1rem;
+    margin-bottom: 0;
+    transform-origin: bottom left;
+  }
+
+  html[data-hud-position="right"] #crownfall-hud-dock-col {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    width: 332px;
+    z-index: 210;
+  }
+
+  html[data-hud-position="right"] #crownfall-hud-dock {
+    border-radius: 1rem;
+    margin-bottom: 0;
+    transform-origin: bottom right;
+  }
+
+  html[data-hud-position="right"] #crownfall-hud-events-col {
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    right: auto;
+    align-items: flex-start;
+  }
 }

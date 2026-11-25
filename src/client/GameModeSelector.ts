@@ -1,5 +1,6 @@
 import { GameMapType, GameType } from "@openfront/engine-api/game/GameTypes";
 import { UserMeResponse } from "@openfront/shared/ApiSchemas";
+import { assetUrl } from "@openfront/shared/AssetUrls";
 import { PublicGameInfo, PublicGames } from "@openfront/shared/WireSchemas";
 import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -41,11 +42,11 @@ import {
 } from "./ServerList";
 import type { SinglePlayerModal } from "./SinglePlayerModal";
 import { lastUserMeResponse } from "./UserMeBroadcast";
+import type { UserSettingModal } from "./UserSettingModal";
 import { UsernameInput } from "./UsernameInput";
 import {
   calculateServerTimeOffset,
   getGameModeLabel,
-  getGamesPlayed,
   getSecondsUntilServerTimestamp,
   reloadForUpdate,
   renderDuration,
@@ -54,17 +55,9 @@ import {
 } from "./Utils";
 import { isReplayShellHost } from "./VersionedReplay";
 
-const PRIMARY_ACTION =
-  "bg-malibu-blue hover:bg-aquarius active:bg-malibu-blue/80 hover:scale-y-105 hover:scale-x-[1.01]";
 const SECONDARY_ACTION =
   "bg-surface hover:brightness-[1.08] active:brightness-[0.95] hover:scale-105 hover:shadow-[var(--shadow-action-card-hover)]";
 const DISABLED = "opacity-50 cursor-not-allowed pointer-events-none";
-/** Tutorial card: the panel's gold, dark text for contrast. */
-const TUTORIAL_ACTION =
-  "bg-cyber-yellow hover:bg-yellow-300 active:bg-cyber-yellow/80 !text-gray-900 hover:scale-y-105 hover:scale-x-[1.01]";
-
-/** The Tutorial card shows beside Solo until the player has played this many games. */
-const TUTORIAL_CARD_MAX_GAMES = 5;
 
 /**
  * THE REACHABILITY RULE (OPE-439). Stated once, here; every other call site
@@ -296,6 +289,8 @@ export function shouldBlockJoin(
 @customElement("game-mode-selector")
 export class GameModeSelector extends LitElement {
   @state() private lobbies: PublicGames | null = null;
+  @state() private menuView: "main" | "online" = "main";
+  @state() private customNameDraft = "";
   @state() private inputValid: boolean = true;
   @state() private desktopUpdateState: DesktopUpdateState | null = null;
   @state() private viewerTrusted: boolean = false;
@@ -383,12 +378,16 @@ export class GameModeSelector extends LitElement {
     return this;
   }
 
-  // Silent backstop; the buttons are already disabled while input is invalid.
+  // Silent backstop; if the custom name box was left blank, assign a fresh random name!
   private validateUsername(): boolean {
     const usernameInput = document.querySelector(
       "username-input",
     ) as UsernameInput | null;
-    return usernameInput ? usernameInput.canPlay() : true;
+    if (!usernameInput) return true;
+    if (this.customNameDraft.trim().length === 0) {
+      usernameInput.setCustomOrRandomName("");
+    }
+    return usernameInput.canPlay();
   }
 
   connectedCallback() {
@@ -439,8 +438,18 @@ export class GameModeSelector extends LitElement {
       "username-input",
     ) as UsernameInput | null;
     if (usernameInput) {
+      this.customNameDraft = usernameInput.getCustomChosenUsername();
       this.inputValid = usernameInput.canPlay();
     }
+    void customElements.whenDefined("username-input").then(() => {
+      const ui = document.querySelector(
+        "username-input",
+      ) as UsernameInput | null;
+      if (ui) {
+        this.customNameDraft = ui.getCustomChosenUsername();
+        this.inputValid = ui.canPlay();
+      }
+    });
   }
 
   disconnectedCallback() {
@@ -681,141 +690,391 @@ export class GameModeSelector extends LitElement {
     this.requestUpdate();
   }
 
+  private openSettingsModal = () => {
+    whenModalLoaded("user-setting", () => {
+      (document.querySelector("user-setting") as UserSettingModal)?.open();
+    });
+  };
+
+  private handleCustomNameInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const usernameInput = document.querySelector(
+      "username-input",
+    ) as UsernameInput | null;
+    if (usernameInput) {
+      const stored = usernameInput.setCustomOrRandomName(input.value);
+      this.customNameDraft = stored;
+      if (input.value !== stored && stored.length > 0) {
+        input.value = stored;
+      }
+      this.inputValid = usernameInput.canPlay();
+    } else {
+      this.customNameDraft = input.value;
+    }
+  };
+
+  private handleRollRandomName = () => {
+    const usernameInput = document.querySelector(
+      "username-input",
+    ) as UsernameInput | null;
+    if (usernameInput) {
+      this.customNameDraft = usernameInput.rollVisibleRandomName();
+      this.inputValid = usernameInput.canPlay();
+    }
+  };
+
   render() {
+    const disabled = !this.inputValid || this.inLobby;
+    const onlineCount = this.advertisedLobbyCount();
+
+    return html`
+      <div
+        class="w-full grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] items-center gap-12 lg:gap-16 xl:gap-24"
+      >
+        <!-- LEFT COMMAND RAIL: Logo + Name Box + Stacked Pill Buttons -->
+        <div class="flex flex-col items-center lg:items-start gap-7 w-full">
+          <!-- Ornate Imperial Logo Medallion -->
+          <div class="relative flex items-center justify-center lg:ml-6">
+            <div
+              class="absolute -inset-5 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.22)_0%,transparent_70%)] pointer-events-none"
+            ></div>
+            <div
+              class="relative flex h-28 w-28 items-center justify-center rounded-[2rem] border-2 border-[#d4af37]/55 bg-gradient-to-b from-[#141a26] to-[#080b11] shadow-[0_18px_48px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,243,196,0.25)]"
+            >
+              <div
+                class="flex h-[5.75rem] w-[5.75rem] items-center justify-center rounded-[1.5rem] border border-[#d4af37]/25 bg-[#090d14]"
+              >
+                <img
+                  src=${assetUrl("images/crownfall/logo-crown.svg")}
+                  alt="Crownfall"
+                  class="h-14 w-14 object-contain drop-shadow-[0_0_14px_rgba(243,210,122,0.5)]"
+                  draggable="false"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="w-full max-w-[21rem] flex flex-col gap-3.5">
+            <!-- Enter Name Box (auto-random if left empty!) -->
+            <div class="flex flex-col gap-1.5">
+              <label
+                for="crownfall-name-input"
+                class="px-3 text-xs font-medium tracking-wide text-[#9aa3b2]"
+              >
+                Enter Name
+                <span class="text-[#9aa3b2]/60 font-normal"
+                  >· random if left empty</span
+                >
+              </label>
+              <div
+                class="flex items-center gap-2 h-12 w-full rounded-full border border-white/15 bg-[#0b0f18]/95 pl-5 pr-2 focus-within:border-[#d4af37]/70 focus-within:shadow-[0_0_20px_rgba(212,175,55,0.18)] transition-all"
+              >
+                <input
+                  id="crownfall-name-input"
+                  type="text"
+                  maxlength="27"
+                  .value=${this.customNameDraft}
+                  @input=${this.handleCustomNameInput}
+                  placeholder="Random Commander..."
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="min-w-0 flex-1 bg-transparent! text-[#f4f1ea]! placeholder:text-[#9aa3b2]/45 text-base font-medium tracking-wide border-0 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  @click=${this.handleRollRandomName}
+                  title="Roll random name"
+                  aria-label="Roll random name"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#141b29] text-[#f3d27a] hover:border-[#d4af37]/55 hover:bg-[#1c2538] transition-colors cursor-pointer"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    class="size-4"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hidden engine <username-input> kept mounted for auth & boot listeners -->
+            <div class="sr-only pointer-events-none h-0 overflow-hidden">
+              <username-input class="block w-full h-10"></username-input>
+            </div>
+
+            <!-- PLAY -->
+            <button
+              type="button"
+              data-menu-action="start-game"
+              @click=${this.openSinglePlayerModal}
+              ?disabled=${disabled}
+              class="group relative flex items-center justify-center h-14 w-full rounded-full border border-[#f5d782]/75 bg-gradient-to-b from-[#efd077] via-[#d4af37] to-[#a88020] px-8 text-[#07090d] font-bold text-lg tracking-[0.08em] shadow-[0_10px_30px_rgba(212,175,55,0.28)] hover:from-[#fae08e] hover:to-[#be9328] hover:shadow-[0_12px_36px_rgba(212,175,55,0.42)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 cursor-pointer ${
+                disabled ? DISABLED : ""
+              }"
+            >
+              <span>Play</span>
+            </button>
+
+            <!-- ONLINE -->
+            <button
+              type="button"
+              data-menu-action="online"
+              @click=${() => {
+                this.menuView = this.menuView === "online" ? "main" : "online";
+              }}
+              class="group relative flex items-center justify-center gap-2.5 h-14 w-full rounded-full border ${
+                this.menuView === "online"
+                  ? "border-[#f3d27a]/75 bg-[#182030] text-[#f3d27a] shadow-[0_0_24px_rgba(212,175,55,0.2)]"
+                  : "border-white/15 bg-[#0d121c]/95 text-[#f4f1ea] hover:border-[#d4af37]/55 hover:bg-[#141b29]"
+              } px-8 font-semibold text-lg tracking-[0.06em] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 cursor-pointer"
+            >
+              <span>${translateText("crownfall.menu_online")}</span>
+              ${
+                onlineCount > 0
+                  ? html`<span
+                      class="inline-flex items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 text-[11px] font-bold text-emerald-300"
+                    >
+                      ${onlineCount}
+                    </span>`
+                  : nothing
+              }
+            </button>
+
+            <!-- SETTINGS -->
+            <button
+              type="button"
+              data-menu-action="settings"
+              @click=${this.openSettingsModal}
+              class="group relative flex items-center justify-center h-14 w-full rounded-full border border-white/15 bg-[#0d121c]/95 px-8 text-[#f4f1ea] font-semibold text-lg tracking-[0.06em] hover:border-[#d4af37]/55 hover:bg-[#141b29] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 cursor-pointer"
+            >
+              <span>${translateText("crownfall.menu_settings")}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RIGHT STAGE: Wide Full-Width Crownfall Showcase OR Spacious Online Lobby Stage -->
+        <div class="min-w-0 w-full flex items-center justify-center lg:justify-start">
+          ${
+            this.menuView === "online"
+              ? this.renderOnlineStage()
+              : this.renderBrandStage()
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  private renderBrandStage() {
+    return html`
+      <div
+        class="flex flex-col items-center lg:items-start text-center lg:text-left select-none max-w-2xl"
+      >
+        <div
+          class="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/30 bg-[#d4af37]/[0.07] px-3.5 py-1 text-[11px] font-semibold tracking-[0.2em] uppercase text-[#f3d27a]/90"
+        >
+          <span>Sovereign Strategy</span>
+        </div>
+
+        <h1
+          class="m-0 font-bold tracking-[0.14em] uppercase leading-none bg-gradient-to-b from-[#fff8e1] via-[#f0cd74] to-[#9e7620] bg-clip-text text-transparent drop-shadow-[0_12px_36px_rgba(0,0,0,0.75)]"
+          style="font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3rem, 6.8vw, 6.25rem);"
+        >
+          Crownfall
+        </h1>
+
+        <div
+          class="my-5 h-px w-48 lg:w-72 bg-gradient-to-r from-[#d4af37]/70 via-[#d4af37]/25 to-transparent"
+        ></div>
+
+        <p
+          class="m-0 text-lg sm:text-xl font-normal text-[#e5e1d8]/90 tracking-wide max-w-lg leading-relaxed"
+          style="font-family: Georgia, 'Times New Roman', serif;"
+        >
+          Rise to power. Fight to remain.
+        </p>
+
+        <p class="mt-3 text-sm text-[#9aa3b2]/80 max-w-md leading-relaxed">
+          Forge your nation's doctrine, govern living civilian populations,
+          command allied offensives, and endure internal crises in real-time
+          territorial warfare.
+        </p>
+      </div>
+    `;
+  }
+
+  private renderOnlineStage() {
     const ffa = this.lobbies?.games?.["ffa"]?.[0];
     const teams = this.lobbies?.games?.["team"]?.[0];
     const special = this.lobbies?.games?.["special"]?.[0];
-    // A lone secondary card takes both of the column's card rows.
-    const cardRows =
-      teams && special
-        ? { special: "sm:row-start-2", teams: "sm:row-start-3" }
-        : {
-            special: "sm:row-start-2 sm:row-span-2",
-            teams: "sm:row-start-2 sm:row-span-2",
-          };
+    const disabled = !this.inputValid || this.inLobby;
+    const hostedCount = this.hostedLobbyCount();
 
-    // DOM is in phone order; sm+ places the same elements onto a grid and
-    // reading-flow keeps focus order following the rows (Chromium only).
-    // On compact screens (styles.css) Solo/Tutorial sit under the hero card only,
-    // and the lobby column runs down beside them, so its two cards get that height.
-    // There the grid also pulls up over the gap after the banner's row when it's empty.
     return html`
       <div
-        class="flex flex-col gap-4 sm:compact:gap-3 sm:compact:has-[>ios-add-to-home-screen-banner:empty]:-mt-3 w-full px-4 pb-4 mx-auto sm:px-0 sm:pb-0 sm:grid sm:grid-cols-[2fr_1fr] sm:grid-rows-[auto_min(24rem,40vh)_auto_auto] sm:compact:grid-rows-[auto_minmax(min(24rem,40vh),auto)_3.5rem_auto] desktop:sm:grid-rows-[auto_40vh_auto_auto] sm:[reading-flow:grid-rows]"
+        class="w-full max-w-4xl rounded-3xl border border-[#d4af37]/25 bg-[#0d121c]/95 p-6 sm:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.78)] flex flex-col gap-5"
       >
-        <ios-add-to-home-screen-banner
-          class="no-game-portal [&:empty]:hidden sm:col-span-2 sm:row-start-1"
-        ></ios-add-to-home-screen-banner>
-
         <div
-          class="flex gap-4 sm:compact:gap-3 h-14 sm:col-span-2 sm:row-start-3 sm:compact:col-span-1!"
+          class="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] pb-4"
         >
-          <div class="flex-[2]">
-            ${this.renderSmallActionCard(
-              translateText("main.solo"),
-              this.openSinglePlayerModal,
-              PRIMARY_ACTION,
-            )}
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              @click=${() => {
+                this.menuView = "main";
+              }}
+              class="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#151c2b] px-4 py-1.5 text-sm font-semibold text-[#f4f1ea] hover:border-[#d4af37]/50 hover:text-[#f3d27a] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                class="size-4"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              ${translateText("crownfall.menu_back")}
+            </button>
+            <span
+              class="text-base sm:text-lg font-bold tracking-wide text-[#f3d27a] whitespace-nowrap"
+            >
+              ${translateText("crownfall.menu_public_matches")}
+            </span>
           </div>
-          ${
-            getGamesPlayed() < TUTORIAL_CARD_MAX_GAMES
-              ? html`<div class="flex-1">
-                  ${this.renderSmallActionCard(
-                    translateText("main.tutorial"),
-                    this.startTutorial,
-                    TUTORIAL_ACTION,
-                  )}
-                </div>`
-              : nothing
-          }
+
+          <button
+            type="button"
+            @click=${this.openDetailedView}
+            ?disabled=${disabled}
+            class="rounded-full border border-white/10 bg-[#151c2b] px-4 py-1.5 text-xs sm:text-sm font-semibold text-[#e5e1d8] hover:border-[#d4af37]/45 hover:text-[#f3d27a] transition-colors cursor-pointer whitespace-nowrap ${
+              disabled ? DISABLED : ""
+            }"
+          >
+            ${translateText("crownfall.menu_browse_lobbies")}
+          </button>
         </div>
+
+        <!-- Wide Spacious Public Match Grid -->
         <div
-          class="grid grid-cols-3 gap-4 sm:compact:gap-3 h-14 sm:col-span-2 sm:row-start-4"
+          class="grid grid-cols-1 ${
+            teams || special ? "xl:grid-cols-[1.35fr_1fr]" : ""
+          } gap-4 items-stretch"
         >
-          ${this.renderSmallActionCard(
-            translateText("main.create"),
-            this.openHostLobby,
-            SECONDARY_ACTION,
-            undefined,
-            true,
-          )}
-          ${this.renderSmallActionCard(
-            translateText("mode_selector.ranked_title"),
-            this.openRankedMenu,
-            SECONDARY_ACTION,
-            undefined,
-            true,
-            // Ranked admits trusted accounts only. A trusted viewer gets the
-            // green open lock; anyone else meets the red locks and the trust
-            // popup inside the ranked modal. Small, so it clears the label on
-            // narrow (mobile) buttons.
-            this.viewerTrusted
-              ? trustLockIcon(true, {
-                  tooltipTitle: translateText(
-                    "mode_selector.ranked_trust_tooltip_title",
-                  ),
-                  position: "top-1 right-1",
-                  small: true,
-                })
-              : nothing,
-          )}
-          ${this.renderSmallActionCard(
-            translateText("main.join"),
-            this.openJoinLobby,
-            SECONDARY_ACTION,
-            this.hostedLobbyCount(),
-            true,
-          )}
-        </div>
+          <div class="min-w-0 h-56 sm:h-64">
+            ${
+              ffa?.gameConfig
+                ? this.renderLobbyCard(ffa, getGameModeLabel(ffa.gameConfig))
+                : this.offlineForLobbies()
+                  ? this.renderLobbiesUnavailable()
+                  : this.lobbies === null
+                    ? html`<div
+                        class="flex items-center justify-center h-full rounded-2xl border border-white/[0.06] bg-[#090d14]"
+                        role="status"
+                        aria-label=${translateText("common.loading")}
+                      >
+                        <span
+                          class="size-10 rounded-full border-[3px] border-[#d4af37]/25 border-t-[#d4af37] animate-spin"
+                        ></span>
+                      </div>`
+                    : html`<div
+                        class="flex items-center justify-center h-full rounded-2xl border border-white/[0.06] bg-[#090d14] text-sm text-[#9aa3b2]"
+                      >
+                        No public lobbies currently open
+                      </div>`
+            }
+          </div>
 
-        <div class="min-w-0 sm:col-start-1 sm:row-start-2">
           ${
-            ffa?.gameConfig
-              ? this.renderLobbyCard(ffa, getGameModeLabel(ffa.gameConfig))
-              : this.offlineForLobbies()
-                ? this.renderLobbiesUnavailable()
-                : this.lobbies === null
-                  ? html`<div
-                      class="flex items-center justify-center h-44 sm:h-full"
-                      role="status"
-                      aria-label=${translateText("common.loading")}
-                    >
-                      <span
-                        class="size-24 rounded-full border-[6px] border-blue-500/30 border-t-blue-500 animate-spin"
-                      ></span>
-                    </div>`
-                  : html`<div
-                      class="h-44 sm:h-full rounded-2xl bg-surface"
-                    ></div>`
-          }
-        </div>
-
-        <!-- Always rendered: the heading is the only way into the lobby browser. -->
-        <section
-          class="flex flex-col gap-4 sm:compact:gap-3 min-w-0 sm:grid sm:grid-rows-[auto_1fr_1fr] sm:row-start-2 sm:min-h-0 sm:[reading-flow:grid-rows] sm:col-start-2 sm:compact:row-end-4 sm:compact:grid-rows-[auto_minmax(7.5rem,1fr)_minmax(7.5rem,1fr)]"
-        >
-          ${
-            teams
-              ? html`<div class="min-w-0 sm:min-h-0 ${cardRows.teams}">
-                  ${this.renderLobbyCard(
-                    teams,
-                    getGameModeLabel(teams.gameConfig!),
-                  )}
+            teams || special
+              ? html`<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
+                  ${
+                    teams
+                      ? html`<div class="min-w-0 h-32 xl:h-[7.5rem]">
+                          ${this.renderLobbyCard(
+                            teams,
+                            getGameModeLabel(teams.gameConfig!),
+                          )}
+                        </div>`
+                      : nothing
+                  }
+                  ${
+                    special
+                      ? html`<div class="min-w-0 h-32 xl:h-[7.5rem]">
+                          ${this.renderLobbyCard(
+                            special,
+                            getGameModeLabel(special.gameConfig!),
+                          )}
+                        </div>`
+                      : nothing
+                  }
                 </div>`
               : nothing
           }
-          ${
-            special
-              ? html`<div class="min-w-0 sm:min-h-0 ${cardRows.special}">
-                  ${this.renderLobbyCard(
-                    special,
-                    getGameModeLabel(special.gameConfig!),
-                  )}
-                </div>`
-              : nothing
-          }
-          ${this.renderUpcomingHeading()}
-        </section>
+        </div>
+
+        <!-- Wide Uncramped Host / Join / Ranked Actions -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+          <button
+            type="button"
+            @click=${this.openHostLobby}
+            ?disabled=${disabled}
+            class="rounded-full border border-[#d4af37]/50 bg-[#d4af37]/15 px-5 py-3 text-sm font-bold text-[#f3d27a] hover:bg-[#d4af37]/25 hover:border-[#f3d27a]/75 transition-colors cursor-pointer whitespace-nowrap ${
+              disabled ? DISABLED : ""
+            }"
+          >
+            ${translateText("crownfall.menu_create_lobby")}
+          </button>
+          <button
+            type="button"
+            @click=${this.openJoinLobby}
+            ?disabled=${disabled}
+            class="relative rounded-full border border-white/15 bg-[#151c2b] px-5 py-3 text-sm font-semibold text-[#f4f1ea] hover:border-[#d4af37]/50 transition-colors cursor-pointer whitespace-nowrap ${
+              disabled ? DISABLED : ""
+            }"
+          >
+            ${translateText("crownfall.menu_join_lobby")}
+            ${
+              hostedCount > 0
+                ? html`<span
+                    class="ml-2 inline-flex items-center justify-center rounded-full bg-[#d4af37]/25 px-2 py-0.5 text-[11px] font-bold text-[#f3d27a]"
+                    >${hostedCount}</span
+                  >`
+                : nothing
+            }
+          </button>
+          <button
+            type="button"
+            @click=${this.openRankedMenu}
+            ?disabled=${disabled}
+            class="relative rounded-full border border-white/15 bg-[#151c2b] px-5 py-3 text-sm font-semibold text-[#f4f1ea] hover:border-[#d4af37]/50 transition-colors cursor-pointer whitespace-nowrap ${
+              disabled ? DISABLED : ""
+            }"
+          >
+            ${translateText("mode_selector.ranked_title")}
+            ${
+              this.viewerTrusted
+                ? trustLockIcon(true, {
+                    tooltipTitle: translateText(
+                      "mode_selector.ranked_trust_tooltip_title",
+                    ),
+                    position: "top-1.5 right-3",
+                    small: true,
+                  })
+                : nothing
+            }
+          </button>
+        </div>
 
         ${
           this.showTrustRequired

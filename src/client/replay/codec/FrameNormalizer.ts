@@ -82,6 +82,10 @@ const UPDATE_TYPE_ROUTING: Record<
   SpawnPhaseEnd: "events",
   GamePaused: "misc",
   DonateEvent: "misc",
+  AugmentDraft: "misc",
+  AllianceActionRequest: "misc",
+  AllianceActionReply: "misc",
+  Hegemony: "misc",
 };
 
 /**

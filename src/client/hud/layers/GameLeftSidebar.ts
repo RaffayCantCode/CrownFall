@@ -16,10 +16,6 @@ import type { PlayerStats } from "./PlayerStats";
 import { SpawnBarVisibleEvent } from "./SpawnTimer";
 import "./TeamStats";
 import type { TeamStats } from "./TeamStats";
-const playerStatsRegularIcon = assetUrl(
-  "images/LeaderboardIconRegularWhite.svg",
-);
-const playerStatsSolidIcon = assetUrl("images/LeaderboardIconSolidWhite.svg");
 const teamStatsRegularIcon = assetUrl("images/TeamIconRegularWhite.svg");
 const teamStatsSolidIcon = assetUrl("images/TeamIconSolidWhite.svg");
 
@@ -112,16 +108,21 @@ export class GameLeftSidebar extends LitElement implements Controller {
   }
 
   render() {
+    const crownIcon = assetUrl("images/crownfall/logo-crown.svg");
     return html`
       <aside
-        class=${`max-lg:fixed max-lg:top-0 max-lg:left-0 max-lg:z-900 lg:pointer-events-auto flex flex-col max-h-[calc(100vh-80px)] overflow-y-auto p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-br-lg ${this.isPlayerStatsShown || this.isTeamStatsShown ? "max-[400px]:w-full max-[400px]:rounded-none" : ""} transition-all duration-300 ease-out transform ${
+        class=${`max-lg:fixed max-lg:top-0 max-lg:left-0 max-lg:z-900 lg:pointer-events-auto flex flex-col max-h-[calc(100vh-96px)] overflow-y-auto lg:ml-2 lg:mt-2 p-2.5 bg-[#080b12]/94 border border-[#d4af37]/30 backdrop-blur-md shadow-[0_14px_40px_rgba(0,0,0,0.75)] rounded-br-2xl lg:rounded-2xl ${this.isPlayerStatsShown || this.isTeamStatsShown ? "max-[400px]:w-full max-[400px]:rounded-none" : ""} transition-all duration-300 ease-out transform ${
           this.isVisible ? "translate-x-0" : "hidden"
         }`}
-        style="margin-top: ${this.barOffset}px;"
+        style="margin-top: ${this.barOffset ? this.barOffset + 8 : 8}px;"
       >
-        <div class="flex items-center gap-4 xl:gap-6 text-white">
+        <div class="flex items-center gap-2.5 text-[#f4f1ea]">
           <div
-            class="cursor-pointer p-0.5 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors"
+            class="cursor-pointer inline-flex items-center gap-1.5 px-2 py-1 bg-[#121826] hover:bg-[#192234] border rounded-lg ${
+              this.isPlayerStatsShown
+                ? "border-[#d4af37]/60 text-[#f3d27a]"
+                : "border-white/10 text-[#f4f1ea]"
+            } transition-colors"
             @click=${this.togglePlayerStats}
             role="button"
             tabindex="0"
@@ -133,24 +134,28 @@ export class GameLeftSidebar extends LitElement implements Controller {
             }}
           >
             <img
-              src=${
-                this.isPlayerStatsShown
-                  ? playerStatsSolidIcon
-                  : playerStatsRegularIcon
-              }
+              src=${crownIcon}
               alt=${
                 translateText("help_modal.icon_alt_player_leaderboard") ||
-                "Player Leaderboard Icon"
+                "Standings"
               }
-              width="20"
-              height="20"
+              width="14"
+              height="14"
+              class="object-contain"
             />
+            <span class="text-[11px] font-bold tracking-[0.14em] uppercase"
+              >Standings</span
+            >
           </div>
           ${
             this.isTeamGame
               ? html`
                   <div
-                    class="cursor-pointer p-0.5 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors"
+                    class="cursor-pointer p-1 bg-[#121826] hover:bg-[#192234] border rounded-lg ${
+                      this.isTeamStatsShown
+                        ? "border-[#d4af37]/60"
+                        : "border-white/10"
+                    } transition-colors"
                     @click=${this.toggleTeamStats}
                     role="button"
                     tabindex="0"
@@ -175,8 +180,8 @@ export class GameLeftSidebar extends LitElement implements Controller {
                         translateText("help_modal.icon_alt_team_leaderboard") ||
                         "Team Leaderboard Icon"
                       }
-                      width="20"
-                      height="20"
+                      width="16"
+                      height="16"
                     />
                   </div>
                 `
@@ -185,7 +190,7 @@ export class GameLeftSidebar extends LitElement implements Controller {
           ${
             this.isPlayerStatsShown || this.isTeamStatsShown
               ? html`<span
-                  class="ml-auto text-[10px] text-slate-500 select-all leading-none self-start"
+                  class="ml-auto text-[10px] font-mono text-[#9aa3b2]/60 select-all leading-none"
                   title=${translateText("help_modal.game_id_tooltip")}
                   >${this.game?.gameID() ?? ""}</span
                 >`

@@ -96,7 +96,17 @@ export interface PlayerState {
   civilianPopulation?: number;
   science?: number;
   stability?: number;
+  rebellionMeter?: number;
   taxRate?: string;
+  primaryPath?: string | null;
+  militaryLevel?: number;
+  politicalLevel?: number;
+  scientificLevel?: number;
+  selectedAugments?: string[];
+  pendingAugmentChoices?: string[];
+  activeProject?: string | null;
+  activeProjectExpiresTick?: number;
+  projectCooldownUntilTick?: number;
 }
 
 export interface UnitState {

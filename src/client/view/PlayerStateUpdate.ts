@@ -58,5 +58,23 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
     target.civilianPopulation = pu.civilianPopulation;
   if (pu.science !== undefined) target.science = pu.science;
   if (pu.stability !== undefined) target.stability = pu.stability;
+  if (pu.rebellionMeter !== undefined) {
+    target.rebellionMeter = pu.rebellionMeter;
+  }
   if (pu.taxRate !== undefined) target.taxRate = pu.taxRate;
+  if (pu.primaryPath !== undefined) target.primaryPath = pu.primaryPath;
+  if (pu.militaryLevel !== undefined) target.militaryLevel = pu.militaryLevel;
+  if (pu.politicalLevel !== undefined)
+    target.politicalLevel = pu.politicalLevel;
+  if (pu.scientificLevel !== undefined)
+    target.scientificLevel = pu.scientificLevel;
+  if (pu.selectedAugments !== undefined)
+    target.selectedAugments = pu.selectedAugments.slice();
+  if (pu.pendingAugmentChoices !== undefined)
+    target.pendingAugmentChoices = pu.pendingAugmentChoices.slice();
+  if (pu.activeProject !== undefined) target.activeProject = pu.activeProject;
+  if (pu.activeProjectExpiresTick !== undefined)
+    target.activeProjectExpiresTick = pu.activeProjectExpiresTick;
+  if (pu.projectCooldownUntilTick !== undefined)
+    target.projectCooldownUntilTick = pu.projectCooldownUntilTick;
 }

@@ -44,9 +44,9 @@ const ALIGNMENT_CLASS: Record<ColumnAlignment, string> = {
   center: "justify-center text-center",
   end: "justify-end text-right",
 };
-const CELL_CLASS = "h-6 md:h-8 lg:h-9 min-w-0 px-1 flex items-center";
-const DIVIDER_CLASS = "border-l border-l-slate-600/40";
-const HEADER_DIVIDER_CLASS = "border-l border-l-slate-500";
+const CELL_CLASS = "h-6 md:h-7 lg:h-8 min-w-0 px-1.5 flex items-center";
+const DIVIDER_CLASS = "border-l border-l-white/[0.06]";
+const HEADER_DIVIDER_CLASS = "border-l border-l-white/10";
 
 export abstract class StatsTable extends LitElement {
   public game: GameView | null = null;
@@ -207,7 +207,7 @@ export abstract class StatsTable extends LitElement {
     const sorted = this.sortKey === column.id;
     return html`
       <div
-        class="stats-table-header-cell ${CELL_CLASS} justify-center text-center whitespace-nowrap border-b border-b-slate-500 ${
+        class="stats-table-header-cell ${CELL_CLASS} justify-center text-center whitespace-nowrap border-b border-b-[#d4af37]/25 text-[#f3d27a]/90 ${
           index > 0 ? HEADER_DIVIDER_CLASS : ""
         }"
         role="columnheader"
@@ -225,14 +225,14 @@ export abstract class StatsTable extends LitElement {
         ${
           column.isOrderable
             ? html`<button
-                class="inline-flex items-center justify-center gap-1 hover:text-sky-200 transition-colors"
+                class="inline-flex items-center justify-center gap-1 hover:text-[#fff5d6] transition-colors cursor-pointer"
                 aria-label=${label}
                 @click=${() => this.setSort(column.id)}
               >
                 ${visual}
                 ${
                   sorted
-                    ? html`<span class="text-sky-300" aria-hidden="true"
+                    ? html`<span class="text-[#f3d27a]" aria-hidden="true"
                         >${this.sortOrder === "asc" ? "↑" : "↓"}</span
                       >`
                     : nothing
@@ -271,9 +271,11 @@ export abstract class StatsTable extends LitElement {
   ) {
     return html`
       <div
-        class="stats-table-row grid col-span-full hover:bg-slate-600/60 ${
-          pinned ? "stats-table-pinned-row bg-gray-700/95" : ""
-        } ${row.emphasized ? "font-bold" : ""} ${
+        class="stats-table-row grid col-span-full hover:bg-[#d4af37]/10 transition-colors ${
+          pinned
+            ? "stats-table-pinned-row bg-[#1a1810]/95 border-t border-t-[#d4af37]/35 text-[#f3d27a]"
+            : ""
+        } ${row.emphasized ? "font-bold text-[#f3d27a]" : "text-[#e5e1d8]"} ${
           row.onClick ? "cursor-pointer" : ""
         }"
         style="grid-template-columns: subgrid; grid-column: 1 / -1;"
@@ -351,9 +353,9 @@ export abstract class StatsTable extends LitElement {
         : "max-h-[6rem] md:max-h-[8rem] lg:max-h-[9rem]";
 
     return html`
-      <div class="stats-table relative mt-1 text-white text-xs lg:text-sm">
+      <div class="stats-table relative mt-2 text-[#f4f1ea] text-xs">
         <div
-          class="overflow-x-auto rounded-lg bg-gray-800/85"
+          class="overflow-x-auto rounded-xl border border-white/[0.08] bg-[#0d121c]/92"
           @contextmenu=${(event: Event) => event.preventDefault()}
         >
           <div
@@ -362,7 +364,7 @@ export abstract class StatsTable extends LitElement {
             role="table"
           >
             <div
-              class="stats-table-header grid col-span-full font-bold bg-gray-700/95"
+              class="stats-table-header grid col-span-full font-bold bg-[#141b29]/95"
               style="grid-template-columns: subgrid; grid-column: 1 / -1;"
               role="row"
             >
@@ -372,7 +374,7 @@ export abstract class StatsTable extends LitElement {
                 (column, index) => this.renderHeaderCell(column, index),
               )}
               <div
-                class="${CELL_CLASS} justify-center border-b border-b-slate-500 ${HEADER_DIVIDER_CLASS}"
+                class="${CELL_CLASS} justify-center border-b border-b-[#d4af37]/25 ${HEADER_DIVIDER_CLASS}"
                 role="columnheader"
               >
                 <column-picker
@@ -412,7 +414,7 @@ export abstract class StatsTable extends LitElement {
                     index < scrollableRows.length - 1 ||
                       pinnedRow !== null ||
                       bottomSpacerPx > 0
-                      ? "border-b border-b-slate-500"
+                      ? "border-b border-b-white/[0.06]"
                       : "",
                   ),
               )}

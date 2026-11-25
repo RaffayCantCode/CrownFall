@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "skills": {
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
+    },
+    "ui-skills-root": {
+      "source": "ibelick/ui-skills",
+      "commit": "7ef0076fce1dfa39dd2bc43b7dc13add6eda8a41",
+      "sourceType": "github",
+      "skillPath": "skills/ui-skills-root/SKILL.md",
+      "computedHash": "1eb4241459d13315bb10930554de1ad20bf74568bd5d0f10f4cc0edee1b72439"
+    }
+  }
+}

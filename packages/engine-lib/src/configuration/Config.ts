@@ -11,6 +11,7 @@ import { GameConfig } from "@openfront/engine-api/Schemas";
 import { pow } from "../DetMath";
 import { DoomsdayClockSpeed } from "../game/DoomsdayClock";
 import { assertNever } from "../Util";
+import { CROWNFALL_CONFIG } from "./CrownfallConfig";
 
 export interface NukeMagnitude {
   inner: number;
@@ -141,6 +142,22 @@ export class Config {
       startMinutes: c?.startMinutes ?? d.startMinutes,
       // The drop rate is internal (not wire-configurable): always the default.
       dropPercentPerMinute: d.dropPercentPerMinute,
+    };
+  }
+  // Stable Hegemony Victory config (Crownfall Phase 7), resolved against defaults.
+  stableHegemonyConfig(): {
+    enabled: boolean;
+    holdSeconds: number;
+    minStability: number;
+    decayPerSecond: number;
+  } {
+    const c = this._gameConfig.stableHegemony;
+    const d = CROWNFALL_CONFIG.hegemony;
+    return {
+      enabled: c?.enabled ?? d.enabled,
+      holdSeconds: c?.holdSeconds ?? d.holdSeconds,
+      minStability: c?.minStability ?? d.minStability,
+      decayPerSecond: d.decayPerSecond,
     };
   }
   spawnImmunityDuration(): Tick {
@@ -464,5 +481,10 @@ export class Config {
 
   allianceExtensionPromptOffset(): number {
     return 300; // 30 seconds before expiration
+  }
+
+  /** Whether the synchronized opening Path Draft triggers automatically after spawn phase. */
+  enableOpeningPathDraft(): boolean {
+    return true;
   }
 }

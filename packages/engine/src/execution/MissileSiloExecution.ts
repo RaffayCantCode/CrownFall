@@ -37,8 +37,14 @@ export class MissileSiloExecution implements Execution {
       return;
     }
 
-    const cooldown =
-      this.mg.config().SiloCooldown() - (this.mg.ticks() - frontTime);
+    const siloMods = this.silo.owner().pathModifiers();
+    const effectiveCooldown = Math.max(
+      10,
+      Math.floor(
+        (this.mg.config().SiloCooldown() * siloMods.siloCooldownPercent) / 100,
+      ),
+    );
+    const cooldown = effectiveCooldown - (this.mg.ticks() - frontTime);
 
     if (cooldown <= 0) {
       this.silo.reloadMissile();

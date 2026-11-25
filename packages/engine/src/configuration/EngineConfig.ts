@@ -41,6 +41,10 @@ export interface AttackLogicInput {
   falloutRatio: number | null;
   /** Tiles on the attack front this tick (plus jitter); fixed for the tick. */
   borderSize: number;
+  /** Crownfall path modifiers (integer percents; 100 = neutral). */
+  attackerLossPercent?: number;
+  attackSpeedPercent?: number;
+  defenderSlowPercent?: number;
 }
 
 export interface AttackLogicResult {
@@ -624,15 +628,22 @@ export class EngineConfig extends Config {
       attacker.numTiles,
       LARGE_ATTACKER_SPEED_DEPTH,
     );
+    const attackerLossMod = (input.attackerLossPercent ?? 100) / 100;
+    const attackSpeedMod = (input.attackSpeedPercent ?? 100) / 100;
+    const defenderSlowMod = (input.defenderSlowPercent ?? 100) / 100;
+    // Higher attackSpeedMod = lower tickFraction; lower defenderSlowMod = higher tickFraction
+    const combinedSpeedCostMod = 1 / (attackSpeedMod * defenderSlowMod);
+
     return {
-      attackerTroopLoss,
+      attackerTroopLoss: attackerTroopLoss * attackerLossMod,
       defenderTroopLoss,
       tickFraction:
         (speedCost *
           tileCost *
           largeAttackerSpeedBonus *
           largeDefenderBonus *
-          traitorCostMod) /
+          traitorCostMod *
+          combinedSpeedCostMod) /
         input.borderSize,
     };
   }

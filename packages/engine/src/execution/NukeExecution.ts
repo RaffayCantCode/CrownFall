@@ -58,7 +58,27 @@ export class NukeExecution implements Execution {
   init(mg: Game, ticks: number): void {
     this.mg = mg;
     if (this.speed === -1) {
-      this.speed = this.mg.config().nukeSpeed(this.nukeType);
+      let baseSpeed = this.mg.config().nukeSpeed(this.nukeType);
+      const attackerMods = this.player.pathModifiers();
+      if (attackerMods.nukeSpeedPercent !== 100) {
+        baseSpeed = Math.max(
+          1,
+          Math.floor((baseSpeed * attackerMods.nukeSpeedPercent) / 100),
+        );
+      }
+      const targetOwner = this.target();
+      if (targetOwner.isPlayer()) {
+        const defenderMods = targetOwner.pathModifiers();
+        if (defenderMods.incomingNukeSlowPercent !== 100) {
+          baseSpeed = Math.max(
+            1,
+            Math.floor(
+              (baseSpeed * defenderMods.incomingNukeSlowPercent) / 100,
+            ),
+          );
+        }
+      }
+      this.speed = baseSpeed;
     }
     this.pathFinder = UniversalPathFinding.Parabola(mg, {
       increment: this.speed,
@@ -77,7 +97,21 @@ export class NukeExecution implements Execution {
     if (this.nuke === null) {
       throw new Error("Not initialized");
     }
-    const magnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
+    const rawMagnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
+    const blastPercent = this.player.pathModifiers().nukeBlastRadiusPercent;
+    const magnitude =
+      blastPercent === 100
+        ? rawMagnitude
+        : {
+            inner: Math.max(
+              1,
+              Math.floor((rawMagnitude.inner * blastPercent) / 100),
+            ),
+            outer: Math.max(
+              1,
+              Math.floor((rawMagnitude.outer * blastPercent) / 100),
+            ),
+          };
     const rand = new PseudoRandom(this.mg.ticks());
     const inner2 = magnitude.inner * magnitude.inner;
     const outer2 = magnitude.outer * magnitude.outer;
@@ -157,7 +191,21 @@ export class NukeExecution implements Execution {
       return;
     }
 
-    const magnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
+    const rawMagnitude = this.mg.config().nukeMagnitudes(this.nuke.type());
+    const blastPercent = this.player.pathModifiers().nukeBlastRadiusPercent;
+    const magnitude =
+      blastPercent === 100
+        ? rawMagnitude
+        : {
+            inner: Math.max(
+              1,
+              Math.floor((rawMagnitude.inner * blastPercent) / 100),
+            ),
+            outer: Math.max(
+              1,
+              Math.floor((rawMagnitude.outer * blastPercent) / 100),
+            ),
+          };
 
     const playersToBreakAllianceWith = listNukeBreakAlliance({
       game: this.mg,

@@ -22,6 +22,7 @@ import "./components/GraphicsPresetSelector";
 import "./components/GraphicsPresetTools";
 import "./components/GraphicsSettingsModal";
 import type { GraphicsSettingsModal } from "./components/GraphicsSettingsModal";
+import { hudCustomizationSettings } from "./components/ui/HudCustomizationSettings";
 import { hudOpacitySetting } from "./components/ui/HudOpacitySetting";
 import { modalHeader } from "./components/ui/ModalHeader";
 import {
@@ -1934,6 +1935,7 @@ export class UserSettingModal extends BaseModal {
    */
   private renderGraphicsSettings() {
     return html`
+      ${hudCustomizationSettings(this.userSettings, () => this.requestUpdate())}
       ${hudOpacitySetting(this.userSettings)}
       <!-- 🎨 Graphics preset -->
       <div

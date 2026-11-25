@@ -1,4 +1,7 @@
 // Every entry is `<ClassName>Snapshot`, exported next to its class.
+import { ActivateNationalProjectExecutionSnapshot } from "../execution/ActivateNationalProjectExecution";
+import { AllianceActionReplyExecutionSnapshot } from "../execution/alliance/AllianceActionReplyExecution";
+import { AllianceActionRequestExecutionSnapshot } from "../execution/alliance/AllianceActionRequestExecution";
 import { AllianceExtensionExecutionSnapshot } from "../execution/alliance/AllianceExtensionExecution";
 import { AllianceRejectExecutionSnapshot } from "../execution/alliance/AllianceRejectExecution";
 import { AllianceRequestExecutionSnapshot } from "../execution/alliance/AllianceRequestExecution";
@@ -31,6 +34,8 @@ import { RecomputeRailClusterExecutionSnapshot } from "../execution/RecomputeRai
 import { RetreatExecutionSnapshot } from "../execution/RetreatExecution";
 import { SAMLauncherExecutionSnapshot } from "../execution/SAMLauncherExecution";
 import { SAMMissileExecutionSnapshot } from "../execution/SAMMissileExecution";
+import { SelectAugmentExecutionSnapshot } from "../execution/SelectAugmentExecution";
+import { SelectDevPathExecutionSnapshot } from "../execution/SelectDevPathExecution";
 import { SetTaxRateExecutionSnapshot } from "../execution/SetTaxRateExecution";
 import { ShellExecutionSnapshot } from "../execution/ShellExecution";
 import { SpawnExecutionSnapshot } from "../execution/SpawnExecution";
@@ -41,6 +46,7 @@ import { TrainExecutionSnapshot } from "../execution/TrainExecution";
 import { TrainStationExecutionSnapshot } from "../execution/TrainStationExecution";
 import { TransportShipExecutionSnapshot } from "../execution/TransportShipExecution";
 import { TribeExecutionSnapshot } from "../execution/TribeExecution";
+import { UnlockDevTierExecutionSnapshot } from "../execution/UnlockDevTierExecution";
 import { UpgradeStructureExecutionSnapshot } from "../execution/UpgradeStructureExecution";
 import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
 import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
@@ -54,6 +60,9 @@ import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
  * replaced it.
  */
 export const EXECUTION_SNAPSHOT_TYPES = [
+  ActivateNationalProjectExecutionSnapshot,
+  AllianceActionReplyExecutionSnapshot,
+  AllianceActionRequestExecutionSnapshot,
   AllianceExtensionExecutionSnapshot,
   AllianceRejectExecutionSnapshot,
   AllianceRequestExecutionSnapshot,
@@ -86,6 +95,8 @@ export const EXECUTION_SNAPSHOT_TYPES = [
   RetreatExecutionSnapshot,
   SAMLauncherExecutionSnapshot,
   SAMMissileExecutionSnapshot,
+  SelectAugmentExecutionSnapshot,
+  SelectDevPathExecutionSnapshot,
   SetTaxRateExecutionSnapshot,
   ShellExecutionSnapshot,
   SpawnExecutionSnapshot,
@@ -96,6 +107,7 @@ export const EXECUTION_SNAPSHOT_TYPES = [
   TrainStationExecutionSnapshot,
   TransportShipExecutionSnapshot,
   TribeExecutionSnapshot,
+  UnlockDevTierExecutionSnapshot,
   UpgradeStructureExecutionSnapshot,
   WarshipExecutionSnapshot,
   WinCheckExecutionSnapshot,

@@ -1,23 +1,18 @@
 import { GameType } from "@openfront/engine-api/game/GameTypes";
 import { GameUpdateType } from "@openfront/engine-api/game/GameUpdates";
 import type { AllPlayersStats, Winner } from "@openfront/engine-api/Schemas";
+import { renderNumber } from "@openfront/engine-lib/Format";
 import type { GameXpEligible, Progress } from "@openfront/shared/ApiSchemas";
-import { Pattern } from "@openfront/shared/CosmeticSchemas";
+import { assetUrl } from "@openfront/shared/AssetUrls";
 import { EventBus } from "@openfront/shared/EventBus";
 import { html, LitElement, nothing, TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import {
-  DESKTOP_TUTORIAL_VIDEO_URL,
-  getGamesPlayed,
   getTranslatedPlayerTeamLabel,
   homeHref,
-  isInIframe,
   translateText,
-  TUTORIAL_VIDEO_URL,
 } from "../../../client/Utils";
-import { fetchUserMeUncached, getUserMe, invalidateUserMe } from "../../Api";
-import "../../components/CosmeticCard";
-import { cosmeticSelectionLabel } from "../../components/CosmeticPresentation";
+import { fetchUserMeUncached, invalidateUserMe } from "../../Api";
 import {
   ffaRatingGameOf,
   type FfaRatingGame,
@@ -26,15 +21,7 @@ import {
 import type { GameXpPanelState } from "../../components/GameXpPanel";
 import type { LegendCeremony } from "../../components/LegendCeremony";
 import "../../components/ProfileShare";
-import "../../components/PurchaseButton";
-import "../../components/SteamWishlist";
 import { Controller } from "../../Controller";
-import {
-  fetchCosmetics,
-  purchaseCosmetic,
-  resolveCosmetics,
-} from "../../Cosmetics";
-import { isDesktopShell } from "../../DesktopShell";
 import { gamePortal } from "../../GamePortal";
 import { lobbyPublicGameType } from "../../LobbyPublicGameType";
 import type { MatchmakingMode } from "../../Matchmaking";
@@ -44,7 +31,6 @@ import {
   momentShareText,
   momentShareUrl,
 } from "../../MomentShare";
-import { Platform } from "../../Platform";
 import { MAX_PRESTIGE, reachedLegendThisGame } from "../../Progression";
 import { resolveXpAccount } from "../../ProgressionAccount";
 import { fetchProgressionConfig, pollGameXp } from "../../ProgressionApi";
@@ -63,7 +49,6 @@ import {
 } from "../../ProvisionalXpAtDeath";
 import { requeueModeForRankedType } from "../../RequeueUrl";
 import { PlaySoundEffectEvent } from "../../sound/Sounds";
-import { steamSDK } from "../../SteamSDK";
 import { SendWinnerEvent } from "../../Transport";
 import { shareGame } from "../../utilities/ShareGame";
 import { GameView } from "../../view";
@@ -142,9 +127,6 @@ export class WinModal extends LitElement implements Controller {
   @state()
   private requeueMode: MatchmakingMode | null = null;
 
-  @state()
-  private patternContent: TemplateResult | null = null;
-
   // The XP this game earned. Stays hidden unless there is something to say:
   // no progression, a spectator or a replay never see the section at all.
   @state()
@@ -192,8 +174,6 @@ export class WinModal extends LitElement implements Controller {
 
   private _title: string;
 
-  private rand = Math.random();
-
   // Override to prevent shadow DOM creation
   createRenderRoot() {
     return this;
@@ -204,17 +184,48 @@ export class WinModal extends LitElement implements Controller {
   }
 
   render() {
+    const crestSrc = assetUrl(
+      this.isWin
+        ? "images/crownfall/victory-crown.svg"
+        : "images/crownfall/defeat-shield.svg",
+    );
     return html`
       <div
         class="${
           this.isVisible
-            ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800/70 p-4 md:p-6 shrink-0 rounded-lg z-[10010] shadow-2xl backdrop-blur-xs text-white w-[min(90vw,700px)] max-w-[90%] max-h-[90dvh] overflow-hidden flex flex-col"
+            ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#0b0f17]/95 border border-amber-400/35 p-5 md:p-7 shrink-0 rounded-2xl z-[10010] shadow-[0_24px_80px_rgba(0,0,0,0.88)] backdrop-blur-md text-[#f4f1ea] w-[min(92vw,580px)] max-h-[90dvh] overflow-hidden flex flex-col"
             : "hidden"
         }"
       >
-        <h2 class="m-0 mb-4 text-[26px] text-center text-white shrink-0">
-          ${this._title || ""}
-        </h2>
+        <div class="flex flex-col items-center text-center mb-5 shrink-0">
+          <div
+            class="mb-3 flex h-14 w-14 items-center justify-center rounded-full border ${
+              this.isWin
+                ? "border-amber-400/45 bg-amber-500/10 shadow-[0_0_24px_rgba(212,175,55,0.28)]"
+                : "border-red-400/35 bg-red-500/10 shadow-[0_0_24px_rgba(239,68,68,0.22)]"
+            }"
+          >
+            <img
+              src=${crestSrc}
+              alt=""
+              class="h-8 w-8 object-contain"
+              draggable="false"
+            />
+          </div>
+          <h2
+            class="m-0 text-2xl md:text-3xl font-bold tracking-wide text-[#f4f1ea]"
+            style="font-family: Georgia, 'Times New Roman', serif;"
+          >
+            ${this._title || ""}
+          </h2>
+          <p class="mt-1 text-sm text-[#9aa3b2]">
+            ${
+              this.isWin
+                ? translateText("crownfall.win_subtitle")
+                : translateText("crownfall.defeat_subtitle")
+            }
+          </p>
+        </div>
         <div class="min-h-0 flex-1 overflow-y-auto pr-0.5">
           <game-xp-panel
             .view=${this.xpView}
@@ -452,20 +463,21 @@ export class WinModal extends LitElement implements Controller {
       .win-action-main {
         background: linear-gradient(
           to top,
-          rgba(0, 132, 209, 0.95) 0%,
-          rgba(0, 101, 170, 0.8) 100%
+          rgba(182, 141, 44, 0.96) 0%,
+          rgba(218, 179, 78, 0.95) 100%
         );
-        border-color: rgba(63, 169, 245, 0.55);
+        border-color: rgba(243, 210, 122, 0.7);
+        color: #0b0f17;
       }
       .win-action-main:hover,
       .win-action-main:focus-visible {
         background: linear-gradient(
           to top,
-          rgba(29, 150, 230, 1) 0%,
-          rgba(0, 120, 200, 0.9) 100%
+          rgba(205, 162, 58, 1) 0%,
+          rgba(243, 210, 122, 1) 100%
         );
-        border-color: rgba(125, 200, 255, 0.9);
-        box-shadow: 0 0 20px rgba(63, 169, 245, 0.55);
+        border-color: rgba(255, 236, 173, 0.95);
+        box-shadow: 0 0 20px rgba(212, 175, 55, 0.45);
       }
       .win-action-quiet {
         background: linear-gradient(
@@ -529,159 +541,57 @@ export class WinModal extends LitElement implements Controller {
     </style>`;
   }
 
-  innerHtml() {
-    // The Steam desktop build has nothing to wishlist — fall through to the
-    // other promos so the box is never empty.
-    const canWishlist = !steamSDK.isOnSteam();
+  innerHtml(): TemplateResult {
+    const me = this.game?.myPlayer();
+    const path = me?.primaryPath() ?? null;
+    const pathLabel = path
+      ? path.charAt(0).toUpperCase() + path.slice(1)
+      : "Unpledged";
+    const choicesCount = me?.selectedAugments().length ?? 0;
+    const stability = Math.round(me?.stability() ?? 0);
+    const science = Math.round(me?.science() ?? 0);
+    const gold = me ? renderNumber(me.gold()) : "0";
 
-    if (isInIframe()) {
-      return canWishlist ? this.steamWishlist() : this.discordDisplay();
-    }
-
-    if (!this.isWin && getGamesPlayed() < 3) {
-      return this.renderYoutubeTutorial();
-    }
-    if (this.rand < 0.25 && canWishlist) {
-      return this.steamWishlist();
-    } else if (this.rand < 0.5) {
-      return this.discordDisplay();
-    } else {
-      return this.renderPatternButton();
-    }
-  }
-
-  renderYoutubeTutorial() {
     return html`
-      <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
-        <h3 class="text-xl font-semibold text-white mb-3">
-          ${translateText("win_modal.youtube_tutorial")}
-        </h3>
-        <!-- 56.25% = 9:16 -->
-        <div class="relative w-full pb-[56.25%]">
-          ${
-            Platform.isElectron
-              ? html`<video
-                  class="absolute top-0 left-0 w-full h-full rounded-sm"
-                  src="${this.isVisible ? DESKTOP_TUTORIAL_VIDEO_URL : ""}"
-                  controls
-                  preload="metadata"
-                ></video>`
-              : html`<iframe
-                  class="absolute top-0 left-0 w-full h-full rounded-sm"
-                  src="${this.isVisible ? TUTORIAL_VIDEO_URL : ""}"
-                  title="YouTube video player"
-                  frameborder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowfullscreen
-                ></iframe>`
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  renderPatternButton() {
-    return html`
-      <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
-        <h3 class="text-xl font-semibold text-white mb-3">
-          ${translateText("win_modal.support_openfront")}
-        </h3>
-        ${
-          isDesktopShell()
-            ? null
-            : html`<p class="text-white mb-3">
-                ${translateText("win_modal.territory_pattern")}
-              </p>`
-        }
-        <div
-          class="mx-auto w-full overflow-x-auto overflow-y-visible rounded-sm"
-        >
-          <div
-            class="flex min-w-max items-start justify-center gap-4 px-1 py-1"
-          >
-            ${this.patternContent}
+      <div class="mb-4 rounded-xl border border-white/10 bg-[#131924] p-4">
+        <div class="grid grid-cols-2 gap-3 text-left">
+          <div class="rounded-lg border border-white/5 bg-[#0b0f17]/80 px-3.5 py-2.5">
+            <div class="text-xs text-[#9aa3b2]">Development Path</div>
+            <div class="mt-0.5 text-base font-semibold text-amber-300">
+              ${pathLabel}
+            </div>
+          </div>
+          <div class="rounded-lg border border-white/5 bg-[#0b0f17]/80 px-3.5 py-2.5">
+            <div class="text-xs text-[#9aa3b2]">National Choices</div>
+            <div class="mt-0.5 text-base font-semibold text-[#f4f1ea]">
+              ${choicesCount} / 5
+            </div>
+          </div>
+          <div class="rounded-lg border border-white/5 bg-[#0b0f17]/80 px-3.5 py-2.5">
+            <div class="text-xs text-[#9aa3b2]">Final Stability</div>
+            <div class="mt-0.5 text-base font-semibold ${
+              stability >= 60
+                ? "text-emerald-400"
+                : stability >= 35
+                  ? "text-amber-300"
+                  : "text-red-400"
+            }">
+              ${stability}%
+            </div>
+          </div>
+          <div class="rounded-lg border border-white/5 bg-[#0b0f17]/80 px-3.5 py-2.5">
+            <div class="text-xs text-[#9aa3b2]">Treasury &amp; Science</div>
+            <div class="mt-0.5 text-base font-semibold text-[#f4f1ea]">
+              ${gold} · ${science} SCI
+            </div>
           </div>
         </div>
       </div>
     `;
   }
 
-  async loadPatternContent() {
-    const me = await getUserMe();
-    const cosmetics = await fetchCosmetics();
-
-    const purchasable = resolveCosmetics(cosmetics, me, null).filter(
-      (r) => r.type === "pattern" && r.relationship === "purchasable",
-    );
-
-    if (purchasable.length === 0) {
-      this.patternContent = html``;
-      return;
-    }
-
-    // Shuffle the array and take patterns. Will always be 3 wide to allow scrolling
-    const shuffled = [...purchasable].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(3, shuffled.length));
-
-    this.patternContent = html`
-      <div class="flex gap-4 flex-nowrap justify-start items-start">
-        ${selected.map((resolved) => {
-          // Only patterns were selected above.
-          const pattern = resolved.cosmetic as Pattern | null;
-          return html`
-            <div data-win-cosmetic-promo class="flex w-40 flex-col gap-2">
-              <cosmetic-card
-                .resolved=${resolved}
-                .interactive=${false}
-              ></cosmetic-card>
-              <purchase-button
-                .priceHard=${pattern?.priceHard ?? null}
-                .priceSoft=${pattern?.priceSoft ?? null}
-                .rarity=${pattern?.rarity ?? "common"}
-                .itemName=${cosmeticSelectionLabel(resolved)}
-                .onPurchaseHard=${() => purchaseCosmetic(resolved, "hard", { kind: "post_game" })}
-                .onPurchaseSoft=${() => purchaseCosmetic(resolved, "soft", { kind: "post_game" })}
-              ></purchase-button>
-            </div>
-          `;
-        })}
-      </div>
-    `;
-  }
-
-  steamWishlist(): TemplateResult {
-    return html`
-      <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
-        <h3 class="text-xl font-semibold text-white mb-3">
-          ${translateText("steam_wishlist.buy_on_steam")}
-        </h3>
-        <steam-wishlist
-          campaign="win_modal"
-          .active=${this.isVisible}
-        ></steam-wishlist>
-      </div>
-    `;
-  }
-
-  discordDisplay(): TemplateResult {
-    return html`
-      <div class="text-center mb-6 bg-black/30 p-2.5 rounded-sm">
-        <h3 class="text-xl font-semibold text-white mb-3">
-          ${translateText("win_modal.join_discord")}
-        </h3>
-        <p class="text-white mb-3">
-          ${translateText("win_modal.discord_description")}
-        </p>
-        <a
-          href="https://discord.com/invite/openfront"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-block px-6 py-3 bg-indigo-600 text-white rounded-sm font-semibold transition-all duration-200 hover:bg-indigo-700 hover:-translate-y-px no-underline"
-        >
-          ${translateText("win_modal.join_server")}
-        </a>
-      </div>
-    `;
+  async loadPatternContent(): Promise<void> {
+    // Removed upstream cosmetic store promo in Crownfall.
   }
 
   async show() {
@@ -692,13 +602,6 @@ export class WinModal extends LitElement implements Controller {
       this.game.config().gameConfig().rankedType,
     );
     this.isVisible = true;
-    this.requestUpdate();
-    try {
-      await this.loadPatternContent();
-    } catch (error) {
-      console.warn("Failed to load win modal cosmetics", error);
-      return;
-    }
     this.requestUpdate();
   }
 

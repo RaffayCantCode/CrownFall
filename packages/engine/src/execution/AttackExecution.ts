@@ -377,6 +377,8 @@ export class AttackExecution implements Execution {
         UnitType.DefensePost,
         defender.id(),
       );
+    const attackerMods = this._owner.pathModifiers();
+    const defenderMods = defender !== null ? defender.pathModifiers() : null;
     return {
       terrain: this.map.terrainType(tile),
       attackTroops,
@@ -400,6 +402,9 @@ export class AttackExecution implements Execution {
         ? this.mg.numTilesWithFallout() / this.mg.numLandTiles()
         : null,
       borderSize,
+      attackerLossPercent: attackerMods.attackerLossPercent,
+      attackSpeedPercent: attackerMods.attackSpeedPercent,
+      defenderSlowPercent: defenderMods?.defenderSlowPercent ?? 100,
     };
   }
 

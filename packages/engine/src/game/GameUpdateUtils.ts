@@ -66,13 +66,23 @@ export function diffPlayerUpdate(
     prev.civilianPopulation === next.civilianPopulation &&
     prev.science === next.science &&
     prev.stability === next.stability &&
+    prev.rebellionMeter === next.rebellionMeter &&
+    prev.activeProject === next.activeProject &&
+    prev.activeProjectExpiresTick === next.activeProjectExpiresTick &&
+    prev.projectCooldownUntilTick === next.projectCooldownUntilTick &&
     prev.taxRate === next.taxRate &&
+    prev.primaryPath === next.primaryPath &&
+    prev.militaryLevel === next.militaryLevel &&
+    prev.politicalLevel === next.politicalLevel &&
+    prev.scientificLevel === next.scientificLevel &&
     numberArrayEqual(prev.allies, next.allies) &&
     numberArrayEqual(prev.targets, next.targets) &&
     stringArrayEqual(
       prev.outgoingAllianceRequests,
       next.outgoingAllianceRequests,
     ) &&
+    stringArrayEqual(prev.selectedAugments, next.selectedAugments) &&
+    stringArrayEqual(prev.pendingAugmentChoices, next.pendingAugmentChoices) &&
     stringSetEqual(prev.embargoes, next.embargoes) &&
     emojiArrayEqual(prev.outgoingEmojis, next.outgoingEmojis) &&
     attackArrayMembershipEqual(prev.outgoingAttacks, next.outgoingAttacks) &&
@@ -140,7 +150,24 @@ export function diffPlayerUpdate(
   );
   setIfDifferent("science", prev.science === next.science);
   setIfDifferent("stability", prev.stability === next.stability);
+  setIfDifferent("rebellionMeter", prev.rebellionMeter === next.rebellionMeter);
+  setIfDifferent("activeProject", prev.activeProject === next.activeProject);
+  setIfDifferent(
+    "activeProjectExpiresTick",
+    prev.activeProjectExpiresTick === next.activeProjectExpiresTick,
+  );
+  setIfDifferent(
+    "projectCooldownUntilTick",
+    prev.projectCooldownUntilTick === next.projectCooldownUntilTick,
+  );
   setIfDifferent("taxRate", prev.taxRate === next.taxRate);
+  setIfDifferent("primaryPath", prev.primaryPath === next.primaryPath);
+  setIfDifferent("militaryLevel", prev.militaryLevel === next.militaryLevel);
+  setIfDifferent("politicalLevel", prev.politicalLevel === next.politicalLevel);
+  setIfDifferent(
+    "scientificLevel",
+    prev.scientificLevel === next.scientificLevel,
+  );
   setIfDifferent("allies", numberArrayEqual(prev.allies, next.allies));
   setIfDifferent("targets", numberArrayEqual(prev.targets, next.targets));
   setIfDifferent(
@@ -149,6 +176,14 @@ export function diffPlayerUpdate(
       prev.outgoingAllianceRequests,
       next.outgoingAllianceRequests,
     ),
+  );
+  setIfDifferent(
+    "selectedAugments",
+    stringArrayEqual(prev.selectedAugments, next.selectedAugments),
+  );
+  setIfDifferent(
+    "pendingAugmentChoices",
+    stringArrayEqual(prev.pendingAugmentChoices, next.pendingAugmentChoices),
   );
   setIfDifferent("embargoes", stringSetEqual(prev.embargoes, next.embargoes));
   setIfDifferent(

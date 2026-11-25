@@ -1,15 +1,19 @@
 import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  AllianceActionType,
   AllianceInfo,
   AllPlayers,
+  AugmentId,
   BuildableUnit,
   Cell,
+  DevelopmentPath,
   Difficulty,
   EmojiMessage,
   GameUpdates,
   Gold,
   MessageType,
   Nation,
+  NationalProject,
   NukeState,
   PlayerBuildableUnitType,
   PlayerID,
@@ -29,6 +33,10 @@ import {
   UnitType,
   WarshipState,
 } from "@openfront/engine-api/game/GameTypes";
+import {
+  type CrownfallPathModifiers,
+  type PathProgress,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
 import {
   GameUpdate,
   PlayerUpdate,
@@ -401,8 +409,31 @@ export interface Player extends PlayerLike {
   addScience(delta: number): void;
   stability(): number;
   setStability(stability: number): void;
+  rebellionMeter(): number;
+  setRebellionMeter(meter: number): void;
+  rebellionCooldownTicks(): number;
+  setRebellionCooldownTicks(ticks: number): void;
+  activeProject(): NationalProject | null;
+  activeProjectExpiresTick(): number;
+  projectCooldownUntilTick(): number;
+  clearExpiredProject(currentTick: number): void;
+  activateNationalProject(project: NationalProject): boolean;
   taxRate(): TaxRate;
   setTaxRate(taxRate: TaxRate): void;
+
+  // Crownfall national development paths
+  primaryPath(): DevelopmentPath | null;
+  setPrimaryPath(path: DevelopmentPath): boolean;
+  devLevel(path: DevelopmentPath): number;
+  unlockDevTier(path: DevelopmentPath): boolean;
+  pathProgress(): PathProgress;
+  pathModifiers(): CrownfallPathModifiers;
+
+  // Crownfall national augments (max 5 per match)
+  selectedAugments(): readonly AugmentId[];
+  pendingAugmentChoices(): readonly AugmentId[];
+  offerAugmentChoices(choices: AugmentId[]): void;
+  selectAugment(id: AugmentId): boolean;
   removeTroops(troops: number): number;
 
   // Units
@@ -595,6 +626,21 @@ export interface Game extends GameLike {
   config(): EngineConfig;
   isPaused(): boolean;
   setPaused(paused: boolean): void;
+  isAugmentDraftActive(): boolean;
+  isPathDraftActive(): boolean;
+  triggerPathDraft(): boolean;
+  triggerAugmentDraft(): boolean;
+  createAllianceActionRequest(
+    requestor: Player,
+    recipient: Player,
+    actionType: AllianceActionType,
+    target: Player | null,
+  ): number | null;
+  replyAllianceActionRequest(
+    recipient: Player,
+    requestID: number,
+    accept: boolean,
+  ): boolean;
 
   // Units
   unit(id: number): Unit | undefined;

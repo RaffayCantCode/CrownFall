@@ -1,7 +1,9 @@
 import { GameMap, TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  AllianceActionType,
   Cell,
   ColoredTeams,
+  DevelopmentPath,
   Difficulty,
   Duos,
   EmojiMessage,
@@ -39,6 +41,13 @@ import {
   Winner,
 } from "@openfront/engine-api/Schemas";
 import { ATTACK_INDEX_SENT } from "@openfront/engine-api/StatsSchemas";
+import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
+import {
+  AUGMENT_ROUND_TICKS,
+  MAX_AUGMENTS_PER_PLAYER,
+  MULTIPLAYER_DRAFT_TIMEOUT_TICKS,
+  rollAugmentChoices,
+} from "@openfront/engine-lib/configuration/CrownfallAugments";
 import { renderNumber } from "@openfront/engine-lib/Format";
 import { GameMapImpl } from "@openfront/engine-lib/game/GameMapImpl";
 import {
@@ -66,7 +75,11 @@ import {
   SharedWaterCache,
   SharedWaterCacheSnapshot,
 } from "../execution/nation/SharedWaterCache";
+import { AttackExecution } from "../execution/AttackExecution";
+import { MarkDisconnectedExecution } from "../execution/MarkDisconnectedExecution";
 import { NationExecution } from "../execution/NationExecution";
+import { SelectAugmentExecution } from "../execution/SelectAugmentExecution";
+import { SelectDevPathExecution } from "../execution/SelectDevPathExecution";
 import { SpawnTimerExecution } from "../execution/SpawnTimerExecution";
 import { TribeExecution } from "../execution/TribeExecution";
 import { AbstractGraph } from "../pathfinding/algorithms/AbstractGraph";
@@ -172,6 +185,23 @@ export class GameImpl implements Game {
   private _nationMirvTargets = new Map<PlayerID, Tick>();
 
   private _isPaused: boolean = false;
+  private _pathDraftTriggered: boolean = false;
+  private _pathDraftActive: boolean = false;
+  private _augmentRoundsTriggered: number = 0;
+  private _augmentDraftActive: boolean = false;
+  private _augmentDraftTicksRemaining: number = -1;
+  private _activeGameplayTicks: number = 0;
+  private _nextAllianceActionID: number = 1;
+  private _pendingAllianceActions: {
+    id: number;
+    requestorID: PlayerID;
+    recipientID: PlayerID;
+    actionType: AllianceActionType;
+    targetID: PlayerID | null;
+    createdAt: Tick;
+    expiresAt: Tick;
+  }[] = [];
+  private _allianceActionCooldowns = new Map<string, Tick>();
   private _winner: Player | Team | null = null;
   private _waterManager: WaterManager;
   private _sharedWaterCache: SharedWaterCache;
@@ -533,6 +563,422 @@ export class GameImpl implements Game {
     this.addUpdate({ type: GameUpdateType.GamePaused, paused });
   }
 
+  isAugmentDraftActive(): boolean {
+    return this._augmentDraftActive;
+  }
+
+  isPathDraftActive(): boolean {
+    return this._pathDraftActive;
+  }
+
+  createAllianceActionRequest(
+    requestor: Player,
+    recipient: Player,
+    actionType: AllianceActionType,
+    target: Player | null,
+  ): number | null {
+    if (!requestor.isAlive() || !recipient.isAlive() || requestor === recipient) {
+      return null;
+    }
+    if (!requestor.isFriendly(recipient)) {
+      return null;
+    }
+    if (actionType === AllianceActionType.JointAttack) {
+      if (target === null || !target.isAlive() || recipient.isFriendly(target)) {
+        return null;
+      }
+    }
+
+    const pairKey = `${requestor.id()}:${recipient.id()}`;
+    const lastTick = this._allianceActionCooldowns.get(pairKey);
+    if (
+      lastTick !== undefined &&
+      this._ticks - lastTick < CROWNFALL_ALLIANCE_CONFIG.requestCooldownTicks
+    ) {
+      return null;
+    }
+
+    // Reject duplicate active request for the same pair
+    const existing = this._pendingAllianceActions.some(
+      (r) =>
+        r.requestorID === requestor.id() &&
+        r.recipientID === recipient.id() &&
+        r.expiresAt > this._ticks,
+    );
+    if (existing) {
+      return null;
+    }
+
+    const id = this._nextAllianceActionID++;
+    const expiresAt =
+      this._ticks + CROWNFALL_ALLIANCE_CONFIG.requestExpirationTicks;
+    this._pendingAllianceActions.push({
+      id,
+      requestorID: requestor.id(),
+      recipientID: recipient.id(),
+      actionType,
+      targetID: target ? target.id() : null,
+      createdAt: this._ticks,
+      expiresAt,
+    });
+    this._allianceActionCooldowns.set(pairKey, this._ticks);
+
+    this.addUpdate({
+      type: GameUpdateType.AllianceActionRequest,
+      requestID: id,
+      requestorID: requestor.smallID(),
+      recipientID: recipient.smallID(),
+      actionType,
+      targetID: target ? target.smallID() : null,
+      createdAt: this._ticks,
+      expiresAt,
+    });
+    return id;
+  }
+
+  replyAllianceActionRequest(
+    recipient: Player,
+    requestID: number,
+    accept: boolean,
+  ): boolean {
+    const idx = this._pendingAllianceActions.findIndex(
+      (r) => r.id === requestID,
+    );
+    if (idx === -1) return false;
+    const req = this._pendingAllianceActions[idx];
+    if (req.recipientID !== recipient.id()) return false;
+    this._pendingAllianceActions.splice(idx, 1);
+
+    if (req.expiresAt <= this._ticks || !this.hasPlayer(req.requestorID)) {
+      return false;
+    }
+    const requestor = this.player(req.requestorID);
+    if (!requestor.isAlive() || !recipient.isAlive() || !requestor.isFriendly(recipient)) {
+      return false;
+    }
+
+    let executed = false;
+    if (accept) {
+      if (req.actionType === AllianceActionType.JointAttack) {
+        if (req.targetID !== null && this.hasPlayer(req.targetID)) {
+          const target = this.player(req.targetID);
+          if (target.isAlive() && !recipient.isFriendly(target)) {
+            const troops = Math.floor(
+              (recipient.troops() *
+                CROWNFALL_ALLIANCE_CONFIG.jointAttackTroopPercent) /
+                100,
+            );
+            if (troops > 0) {
+              this.addExecution(
+                new AttackExecution(troops, recipient, target.id(), null),
+              );
+              executed = true;
+            }
+          }
+        }
+      } else if (req.actionType === AllianceActionType.Reinforcements) {
+        const share = Math.floor(
+          (recipient.troops() *
+            CROWNFALL_ALLIANCE_CONFIG.reinforcementTroopPercent) /
+            100,
+        );
+        const freeCap = Math.max(
+          0,
+          Math.floor(this.config().maxTroops(requestor) - requestor.troops()),
+        );
+        const toSend = Math.min(
+          share,
+          CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
+          freeCap,
+        );
+        if (toSend > 0) {
+          recipient.removeTroops(toSend);
+          requestor.addTroops(toSend);
+          executed = true;
+        }
+      } else if (req.actionType === AllianceActionType.DefenseAid) {
+        const share = Math.floor(
+          (recipient.troops() *
+            CROWNFALL_ALLIANCE_CONFIG.defenseAidTroopPercent) /
+            100,
+        );
+        const freeCap = Math.max(
+          0,
+          Math.floor(this.config().maxTroops(requestor) - requestor.troops()),
+        );
+        const toSend = Math.min(
+          share,
+          CROWNFALL_ALLIANCE_CONFIG.maxReinforcementTroops,
+          freeCap,
+        );
+        if (toSend > 0) {
+          recipient.removeTroops(toSend);
+          requestor.addTroops(toSend);
+          executed = true;
+        }
+        if (req.targetID !== null && this.hasPlayer(req.targetID)) {
+          const invader = this.player(req.targetID);
+          if (invader.isAlive() && !recipient.isFriendly(invader)) {
+            const counterTroops = Math.floor(
+              (recipient.troops() *
+                CROWNFALL_ALLIANCE_CONFIG.defenseAidCounterAttackPercent) /
+                100,
+            );
+            if (counterTroops > 0) {
+              this.addExecution(
+                new AttackExecution(
+                  counterTroops,
+                  recipient,
+                  invader.id(),
+                  null,
+                ),
+              );
+              executed = true;
+            }
+          }
+        }
+      }
+    }
+
+    this.addUpdate({
+      type: GameUpdateType.AllianceActionReply,
+      requestID: req.id,
+      requestorID: requestor.smallID(),
+      recipientID: recipient.smallID(),
+      actionType: req.actionType,
+      accepted: accept && executed,
+    });
+    return true;
+  }
+
+  triggerPathDraft(): boolean {
+    if (
+      this._pathDraftActive ||
+      this._pathDraftTriggered ||
+      this._augmentDraftActive ||
+      this.inSpawnPhase()
+    ) {
+      return false;
+    }
+    const eligibleHumans = this._playersBySmallID.filter(
+      (p) =>
+        p.type() === PlayerType.Human &&
+        p.isAlive() &&
+        !p.isDisconnected() &&
+        p.primaryPath() === null,
+    );
+    if (eligibleHumans.length === 0) {
+      return false;
+    }
+
+    this._pathDraftTriggered = true;
+    this._pathDraftActive = true;
+    this._augmentDraftTicksRemaining =
+      this._config.gameConfig().gameType === GameType.Singleplayer
+        ? -1
+        : MULTIPLAYER_DRAFT_TIMEOUT_TICKS;
+
+    this.addUpdate({
+      type: GameUpdateType.AugmentDraft,
+      draftKind: "path",
+      active: true,
+      round: 0,
+      totalRounds: MAX_AUGMENTS_PER_PLAYER,
+      pickedCount: 0,
+      totalCount: eligibleHumans.length,
+      ticksRemaining: this._augmentDraftTicksRemaining,
+    });
+    return true;
+  }
+
+  private tickPathDraft(): void {
+    if (this.unInitExecs.length > 0) {
+      const remaining: Execution[] = [];
+      for (const e of this.unInitExecs) {
+        if (
+          e instanceof SelectDevPathExecution ||
+          e instanceof MarkDisconnectedExecution
+        ) {
+          e.init(this, this._ticks);
+          e.tick(this._ticks);
+        } else {
+          remaining.push(e);
+        }
+      }
+      this.unInitExecs = remaining;
+    }
+
+    const activeHumans = this._playersBySmallID.filter(
+      (p) =>
+        p.type() === PlayerType.Human && p.isAlive() && !p.isDisconnected(),
+    );
+
+    if (this._augmentDraftTicksRemaining > 0) {
+      this._augmentDraftTicksRemaining--;
+      if (this._augmentDraftTicksRemaining === 0) {
+        for (const h of activeHumans) {
+          if (h.primaryPath() === null) {
+            h.setPrimaryPath(DevelopmentPath.Military);
+          }
+        }
+      }
+    }
+
+    const totalCount = activeHumans.length;
+    const pickedCount = activeHumans.filter(
+      (h) => h.primaryPath() !== null,
+    ).length;
+
+    if (totalCount === 0 || pickedCount >= totalCount) {
+      this._pathDraftActive = false;
+      this._augmentDraftTicksRemaining = -1;
+      this.addUpdate({
+        type: GameUpdateType.AugmentDraft,
+        draftKind: "path",
+        active: false,
+        round: 0,
+        totalRounds: MAX_AUGMENTS_PER_PLAYER,
+        pickedCount: totalCount,
+        totalCount,
+        ticksRemaining: 0,
+      });
+    } else {
+      this.addUpdate({
+        type: GameUpdateType.AugmentDraft,
+        draftKind: "path",
+        active: true,
+        round: 0,
+        totalRounds: MAX_AUGMENTS_PER_PLAYER,
+        pickedCount,
+        totalCount,
+        ticksRemaining: this._augmentDraftTicksRemaining,
+      });
+    }
+  }
+
+  triggerAugmentDraft(): boolean {
+    if (
+      this._augmentDraftActive ||
+      this._pathDraftActive ||
+      this._augmentRoundsTriggered >= MAX_AUGMENTS_PER_PLAYER ||
+      this.inSpawnPhase()
+    ) {
+      return false;
+    }
+    const eligibleHumans = this._playersBySmallID.filter(
+      (p) =>
+        p.type() === PlayerType.Human &&
+        p.isAlive() &&
+        !p.isDisconnected() &&
+        p.selectedAugments().length < MAX_AUGMENTS_PER_PLAYER,
+    );
+    if (eligibleHumans.length === 0) {
+      return false;
+    }
+
+    for (const human of eligibleHumans) {
+      const impl = human as PlayerImpl;
+      const choices = rollAugmentChoices(
+        impl._pseudo_random,
+        impl.selectedAugments(),
+      );
+      impl.offerAugmentChoices(choices);
+    }
+
+    this._augmentRoundsTriggered++;
+    this._augmentDraftActive = true;
+    this._augmentDraftTicksRemaining =
+      this._config.gameConfig().gameType === GameType.Singleplayer
+        ? -1
+        : MULTIPLAYER_DRAFT_TIMEOUT_TICKS;
+
+    this.addUpdate({
+      type: GameUpdateType.AugmentDraft,
+      draftKind: "augment",
+      active: true,
+      round: this._augmentRoundsTriggered,
+      totalRounds: MAX_AUGMENTS_PER_PLAYER,
+      pickedCount: 0,
+      totalCount: eligibleHumans.length,
+      ticksRemaining: this._augmentDraftTicksRemaining,
+    });
+    return true;
+  }
+
+  private tickAugmentDraft(): void {
+    // Only allow augment selections & disconnect markers while paused in draft
+    if (this.unInitExecs.length > 0) {
+      const remaining: Execution[] = [];
+      for (const e of this.unInitExecs) {
+        if (
+          e instanceof SelectAugmentExecution ||
+          e instanceof MarkDisconnectedExecution
+        ) {
+          e.init(this, this._ticks);
+          e.tick(this._ticks);
+        } else {
+          remaining.push(e);
+        }
+      }
+      this.unInitExecs = remaining;
+    }
+
+    const activeHumans = this._playersBySmallID.filter(
+      (p) =>
+        p.type() === PlayerType.Human && p.isAlive() && !p.isDisconnected(),
+    );
+
+    if (this._augmentDraftTicksRemaining > 0) {
+      this._augmentDraftTicksRemaining--;
+      if (this._augmentDraftTicksRemaining === 0) {
+        // Deterministic auto-pick on multiplayer timeout so AFK players never stall the match
+        for (const h of activeHumans) {
+          const pending = h.pendingAugmentChoices();
+          if (pending.length > 0) {
+            h.selectAugment(pending[0]);
+          }
+        }
+      }
+    }
+
+    const totalCount = activeHumans.length;
+    const pickedCount = activeHumans.filter(
+      (h) => h.pendingAugmentChoices().length === 0,
+    ).length;
+
+    if (totalCount === 0 || pickedCount >= totalCount) {
+      // Clear any leftover pending choices on dead/disconnected players
+      for (const p of this._playersBySmallID) {
+        if (p.pendingAugmentChoices().length > 0) {
+          p.offerAugmentChoices([]);
+        }
+      }
+      this._augmentDraftActive = false;
+      this._augmentDraftTicksRemaining = -1;
+      this.addUpdate({
+        type: GameUpdateType.AugmentDraft,
+        draftKind: "augment",
+        active: false,
+        round: this._augmentRoundsTriggered,
+        totalRounds: MAX_AUGMENTS_PER_PLAYER,
+        pickedCount: totalCount,
+        totalCount,
+        ticksRemaining: 0,
+      });
+    } else {
+      this.addUpdate({
+        type: GameUpdateType.AugmentDraft,
+        draftKind: "augment",
+        active: true,
+        round: this._augmentRoundsTriggered,
+        totalRounds: MAX_AUGMENTS_PER_PLAYER,
+        pickedCount,
+        totalCount,
+        ticksRemaining: this._augmentDraftTicksRemaining,
+      });
+    }
+  }
+
   inSpawnPhase(): boolean {
     return this.startTick === null;
   }
@@ -602,30 +1048,64 @@ export class GameImpl implements Game {
       this.viewResyncQueued = false;
       this.addViewResync();
     }
-    this.execs.forEach((e) => {
-      if (
-        (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) &&
-        e.isActive()
-      ) {
-        e.tick(this._ticks);
+    if (this._pathDraftActive) {
+      this.tickPathDraft();
+    } else if (this._augmentDraftActive) {
+      this.tickAugmentDraft();
+    } else {
+      this.execs.forEach((e) => {
+        if (
+          (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) &&
+          e.isActive()
+        ) {
+          e.tick(this._ticks);
+        }
+      });
+      if (this.unInitExecs.length > 0) {
+        const inited: Execution[] = [];
+        const unInited: Execution[] = [];
+        for (const e of this.unInitExecs) {
+          if (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) {
+            e.init(this, this._ticks);
+            inited.push(e);
+          } else {
+            unInited.push(e);
+          }
+        }
+        this.execs.push(...inited);
+        this.unInitExecs = unInited;
       }
-    });
-    if (this.unInitExecs.length > 0) {
-      const inited: Execution[] = [];
-      const unInited: Execution[] = [];
-      for (const e of this.unInitExecs) {
-        if (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) {
-          e.init(this, this._ticks);
-          inited.push(e);
-        } else {
-          unInited.push(e);
+
+      this.removeInactiveExecutions();
+
+      if (!this.inSpawnPhase() && !this._config.gameConfig().tutorial) {
+        if (
+          this._ticks % 10 === 0 &&
+          this._pendingAllianceActions.length > 0
+        ) {
+          this._pendingAllianceActions = this._pendingAllianceActions.filter(
+            (r) => r.expiresAt > this._ticks,
+          );
+        }
+        if (
+          !this._pathDraftTriggered &&
+          this._config.enableOpeningPathDraft() &&
+          this._activeGameplayTicks === 0
+        ) {
+          this.triggerPathDraft();
+        }
+        if (!this._pathDraftActive) {
+          this._activeGameplayTicks++;
+          if (
+            this._augmentRoundsTriggered < AUGMENT_ROUND_TICKS.length &&
+            this._activeGameplayTicks >=
+              AUGMENT_ROUND_TICKS[this._augmentRoundsTriggered]
+          ) {
+            this.triggerAugmentDraft();
+          }
         }
       }
-      this.execs.push(...inited);
-      this.unInitExecs = unInited;
     }
-
-    this.removeInactiveExecutions();
 
     for (const player of this._playersBySmallID) {
       // Sampled before toUpdate so the reading is of the tick that just ran.
@@ -1671,6 +2151,17 @@ export class GameImpl implements Game {
       playerTeams: [...this.playerTeams],
       botTeam: this.botTeam,
       isPaused: this._isPaused,
+      pathDraftTriggered: this._pathDraftTriggered,
+      pathDraftActive: this._pathDraftActive,
+      augmentRoundsTriggered: this._augmentRoundsTriggered,
+      augmentDraftActive: this._augmentDraftActive,
+      augmentDraftTicksRemaining: this._augmentDraftTicksRemaining,
+      activeGameplayTicks: this._activeGameplayTicks,
+      nextAllianceActionID: this._nextAllianceActionID,
+      pendingAllianceActions: this._pendingAllianceActions.map((r) => ({
+        ...r,
+      })),
+      allianceActionCooldowns: [...this._allianceActionCooldowns],
       winner:
         this._winner === null
           ? null
@@ -1727,6 +2218,17 @@ export class GameImpl implements Game {
     this.playerTeams = [...s.playerTeams];
     this.botTeam = s.botTeam;
     this._isPaused = s.isPaused;
+    this._pathDraftTriggered = s.pathDraftTriggered;
+    this._pathDraftActive = s.pathDraftActive;
+    this._augmentRoundsTriggered = s.augmentRoundsTriggered;
+    this._augmentDraftActive = s.augmentDraftActive;
+    this._augmentDraftTicksRemaining = s.augmentDraftTicksRemaining;
+    this._activeGameplayTicks = s.activeGameplayTicks;
+    this._nextAllianceActionID = s.nextAllianceActionID;
+    this._pendingAllianceActions = s.pendingAllianceActions.map((r) => ({
+      ...r,
+    }));
+    this._allianceActionCooldowns = new Map(s.allianceActionCooldowns);
     this._winner =
       s.winner === null
         ? null
@@ -1842,7 +2344,27 @@ export class GameImpl implements Game {
 
 export const GameSnapshot = snapshotType({
   name: "Game",
-  version: 1,
+  version: 4,
+  migrations: {
+    1: (d: Record<string, unknown>) => ({
+      ...d,
+      augmentRoundsTriggered: 0,
+      augmentDraftActive: false,
+      augmentDraftTicksRemaining: -1,
+      activeGameplayTicks: 0,
+    }),
+    2: (d: Record<string, unknown>) => ({
+      ...d,
+      pathDraftTriggered: false,
+      pathDraftActive: false,
+    }),
+    3: (d: Record<string, unknown>) => ({
+      ...d,
+      nextAllianceActionID: 1,
+      pendingAllianceActions: [],
+      allianceActionCooldowns: [],
+    }),
+  },
   schema: z.object({
     ticks: zInt(),
     startTick: zInt().nullable(),
@@ -1861,6 +2383,25 @@ export const GameSnapshot = snapshotType({
     playerTeams: z.array(z.string()),
     botTeam: z.string(),
     isPaused: z.boolean(),
+    pathDraftTriggered: z.boolean(),
+    pathDraftActive: z.boolean(),
+    augmentRoundsTriggered: zInt(),
+    augmentDraftActive: z.boolean(),
+    augmentDraftTicksRemaining: zInt(),
+    activeGameplayTicks: zInt(),
+    nextAllianceActionID: zInt(),
+    pendingAllianceActions: z.array(
+      z.object({
+        id: zInt(),
+        requestorID: z.string(),
+        recipientID: z.string(),
+        actionType: z.enum(AllianceActionType),
+        targetID: z.string().nullable(),
+        createdAt: zInt(),
+        expiresAt: zInt(),
+      }),
+    ),
+    allianceActionCooldowns: z.array(z.tuple([z.string(), zInt()])),
     winner: z
       .union([
         z.object({ player: zPlayerRef() }),

@@ -1,5 +1,6 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  AllianceActionType,
   AllPlayers,
   BuildableAttacks,
   bulkCost,
@@ -29,6 +30,7 @@ import { TooltipItem } from "./RadialMenu";
 import { EventBus } from "@openfront/shared/EventBus";
 import {
   BuildUnitIntentEvent,
+  SendAllianceActionRequestIntentEvent,
   SendUpgradeStructureIntentEvent,
 } from "../../Transport";
 const allianceIcon = assetUrl("images/AllianceIconWhite.svg");
@@ -779,6 +781,119 @@ export const centerButtonElement: CenterButtonElement = {
   },
 };
 
+function findActiveEnemyForAllyRequest(
+  params: MenuElementParams,
+): PlayerView | null {
+  const incoming = params.myPlayer.incomingAttacks();
+  if (incoming.length > 0) {
+    const attacker = params.game.playerBySmallID(
+      incoming[0].attackerID,
+    ) as PlayerView | null;
+    if (attacker && attacker.isAlive() && !params.selected?.isFriendly(attacker)) {
+      return attacker;
+    }
+  }
+  const outgoing = params.myPlayer.outgoingAttacks();
+  if (outgoing.length > 0) {
+    const target = params.game.playerBySmallID(
+      outgoing[0].targetID,
+    ) as PlayerView | null;
+    if (target && target.isAlive() && !params.selected?.isFriendly(target)) {
+      return target;
+    }
+  }
+  return null;
+}
+
+const allyOpsMenuElement: MenuElement = {
+  id: "ally_ops_menu",
+  name: "allied ops",
+  disabled: (params: MenuElementParams) =>
+    !params.selected || !params.selected.isFriendly(params.myPlayer),
+  color: "#d4af37",
+  icon: allianceIcon,
+  tooltipKeys: [{ key: "crownfall.alliance.ops_menu", className: "text-amber-300" }],
+  subMenu: (params: MenuElementParams): MenuElement[] => {
+    const ally = params.selected;
+    if (!ally) return [];
+    const enemy = findActiveEnemyForAllyRequest(params);
+    return [
+      {
+        id: "ally_req_reinforcements",
+        name: "request troops",
+        disabled: () => false,
+        color: COLORS.ally,
+        icon: donateTroopIcon,
+        tooltipKeys: [
+          {
+            key: "crownfall.alliance.btn_reinforcements",
+            className: "text-emerald-300",
+          },
+        ],
+        action: (p) => {
+          p.eventBus.emit(
+            new SendAllianceActionRequestIntentEvent(
+              ally.id(),
+              AllianceActionType.Reinforcements,
+              null,
+            ),
+          );
+          p.closeMenu();
+        },
+      },
+      {
+        id: "ally_req_defense",
+        name: "request defense",
+        disabled: () => false,
+        color: "#eab308",
+        icon: allianceIcon,
+        tooltipKeys: [
+          {
+            key: "crownfall.alliance.btn_defense_aid",
+            className: "text-amber-300",
+          },
+        ],
+        action: (p) => {
+          p.eventBus.emit(
+            new SendAllianceActionRequestIntentEvent(
+              ally.id(),
+              AllianceActionType.DefenseAid,
+              enemy ? enemy.id() : null,
+            ),
+          );
+          p.closeMenu();
+        },
+      },
+      {
+        id: "ally_req_attack",
+        name: "request attack",
+        disabled: () => enemy === null,
+        color: "#ef4444",
+        icon: swordIcon,
+        tooltipKeys: [
+          {
+            key: enemy
+              ? "crownfall.alliance.btn_joint_attack"
+              : "crownfall.alliance.btn_joint_attack_no_enemy",
+            className: enemy ? "text-rose-300" : "text-slate-400",
+          },
+        ],
+        action: (p) => {
+          if (!enemy) return;
+          p.eventBus.emit(
+            new SendAllianceActionRequestIntentEvent(
+              ally.id(),
+              AllianceActionType.JointAttack,
+              enemy.id(),
+            ),
+          );
+          p.closeMenu();
+        },
+      },
+    ];
+  },
+};
+
 export const rootMenuElement: MenuElement = {
   id: "root",
   name: "root",
@@ -814,7 +929,11 @@ export const rootMenuElement: MenuElement = {
         ? [deleteUnitElement, allyRequestElement, buildMenuElement]
         : [
             isAllied && !isDisconnected ? allyBreakElement : boatMenuElement,
-            inExtensionWindow ? allyExtendElement : allyRequestElement,
+            inExtensionWindow
+              ? allyExtendElement
+              : isFriendlyTarget(params) && !isDisconnected
+                ? allyOpsMenuElement
+                : allyRequestElement,
             showDonateInsteadOfAttack
               ? donateGoldRadialElement
               : attackMenuElement,

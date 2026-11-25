@@ -981,6 +981,12 @@ async function createClientGame(
     if (unitDisplay) {
       unitDisplay.inputHandler = inputHandler;
     }
+    const nationalDashboard = document.querySelector(
+      "national-dashboard",
+    ) as (HTMLElement & { inputHandler?: typeof inputHandler }) | null;
+    if (nationalDashboard) {
+      nationalDashboard.inputHandler = inputHandler;
+    }
     const onboardingOverlay = document.querySelector(
       "onboarding-overlay",
     ) as OnboardingOverlay | null;

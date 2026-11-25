@@ -106,7 +106,10 @@ class SAMTargetingSystem {
     const curIdx = unit.trajectoryIndex();
     const waitTicks = unit.nukeState().waitTicks ?? 0;
     const expTicks = trajectory.length - 1 - curIdx + waitTicks;
-    const range = this.mg.config().dynamicSamRange(this.sam, ticks + expTicks);
+    const range =
+      (this.mg.config().dynamicSamRange(this.sam, ticks + expTicks) *
+        this.sam.owner().pathModifiers().samRangePercent) /
+      100;
     if (this.mg.euclideanDistSquared(samTile, finalTile) > range * range) {
       return undefined;
     }
@@ -161,9 +164,10 @@ class SAMTargetingSystem {
 
       const nukeTicks = i - curIdx + waitTicks;
       const samTicks = this.tickToReach(samTile, tile);
-      const allowed = this.mg
-        .config()
-        .dynamicSamRange(this.sam, ticks + nukeTicks);
+      const allowed =
+        (this.mg.config().dynamicSamRange(this.sam, ticks + nukeTicks) *
+          this.sam.owner().pathModifiers().samRangePercent) /
+        100;
       if (
         distSq <= allowed * allowed &&
         nukeTicks >= samTicks &&
@@ -370,8 +374,12 @@ export class SAMLauncherExecution implements Execution {
 
     while (this.sam.missileTimerQueue().length > 0) {
       const frontTime = this.sam.missileTimerQueue()[0];
-      const cooldown =
-        this.mg.config().SAMCooldown() - (this.mg.ticks() - frontTime);
+      const samCooldown = Math.floor(
+        (this.mg.config().SAMCooldown() *
+          this.sam.owner().pathModifiers().samCooldownPercent) /
+          100,
+      );
+      const cooldown = samCooldown - (this.mg.ticks() - frontTime);
 
       if (cooldown > 0) {
         break;

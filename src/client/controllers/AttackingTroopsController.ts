@@ -18,10 +18,10 @@ import type { AttackTroopLabel } from "../render/gl/passes/WorldTextPass";
 import { UserSettings } from "../UserSettings";
 import { GameView } from "../view";
 
-// Aquarius (#3fa9f5) for outgoing, red-400 (#f87171) for incoming.
-const OUTGOING_R = 0x3f / 255;
-const OUTGOING_G = 0xa9 / 255;
-const OUTGOING_B = 0xf5 / 255;
+// Crownfall Burnished Gold (#f5d061) for outgoing, crimson (#f87171) for incoming.
+const OUTGOING_R = 0xf5 / 255;
+const OUTGOING_G = 0xd0 / 255;
+const OUTGOING_B = 0x61 / 255;
 const INCOMING_R = 0xf8 / 255;
 const INCOMING_G = 0x71 / 255;
 const INCOMING_B = 0x71 / 255;

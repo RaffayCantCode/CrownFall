@@ -85,14 +85,21 @@ export class MobileNavBar extends LitElement {
           class="flex flex-col text-malibu-blue mb-4 ml-[clamp(0.2rem,0.4vw,0.4vh)]"
         >
           <div class="flex flex-col items-center gap-1">
-            <img
-              src=${assetUrl("images/OpenFrontLogo.svg")}
-              alt="OpenFront"
-              class="w-auto h-auto max-w-[220px] max-h-[4.5rem]"
-            />
+            <div class="flex items-center gap-2">
+              <img
+                src=${assetUrl("images/CrownfallCrownIcon.svg")}
+                alt="Crownfall"
+                class="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(212,175,55,0.45)]"
+              />
+              <span
+                class="text-lg font-extrabold tracking-[0.18em] uppercase bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 bg-clip-text text-transparent"
+              >
+                CROWNFALL
+              </span>
+            </div>
             <div
               id="game-version"
-              class="l-header__highlightText text-center"
+              class="l-header__highlightText text-center text-amber-200/60"
             ></div>
           </div>
         </div>

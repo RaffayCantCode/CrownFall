@@ -1,5 +1,11 @@
-import { MessageType, Tick } from "@openfront/engine-api/game/GameTypes";
 import {
+  AllianceActionType,
+  MessageType,
+  Tick,
+} from "@openfront/engine-api/game/GameTypes";
+import {
+  AllianceActionReplyUpdate,
+  AllianceActionRequestUpdate,
   AllianceExtensionUpdate,
   AllianceRequestReplyUpdate,
   AllianceRequestUpdate,
@@ -13,6 +19,7 @@ import { Controller } from "../../Controller";
 import { PlaySoundEffectEvent } from "../../sound/Sounds";
 import { GoToPlayerEvent } from "../../TransformHandler";
 import {
+  SendAllianceActionReplyIntentEvent,
   SendAllianceExtensionIntentEvent,
   SendAllianceRejectIntentEvent,
   SendAllianceRequestIntentEvent,
@@ -60,6 +67,14 @@ export class ActionableEvents extends LitElement implements Controller {
     [
       GameUpdateType.AllianceExtension,
       this.onAllianceExtensionEvent.bind(this),
+    ],
+    [
+      GameUpdateType.AllianceActionRequest,
+      this.onAllianceActionRequestEvent.bind(this),
+    ],
+    [
+      GameUpdateType.AllianceActionReply,
+      this.onAllianceActionReplyEvent.bind(this),
     ],
   ] as const;
 
@@ -204,6 +219,84 @@ export class ActionableEvents extends LitElement implements Controller {
         this.requestUpdate();
       }
     }
+  }
+
+  onAllianceActionRequestEvent(update: AllianceActionRequestUpdate) {
+    const myPlayer = this.game.myPlayer();
+    if (!myPlayer || update.recipientID !== myPlayer.smallID()) {
+      return;
+    }
+
+    const requestor = this.game.playerBySmallID(
+      update.requestorID,
+    ) as PlayerView;
+    const target =
+      update.targetID !== null
+        ? (this.game.playerBySmallID(update.targetID) as PlayerView | null)
+        : null;
+
+    let description: string;
+    if (update.actionType === AllianceActionType.JointAttack && target) {
+      description = translateText("crownfall.alliance.req_joint_attack", {
+        name: requestor.displayName(),
+        target: target.displayName(),
+      });
+    } else if (update.actionType === AllianceActionType.DefenseAid) {
+      description = target
+        ? translateText("crownfall.alliance.req_defense_aid_target", {
+            name: requestor.displayName(),
+            target: target.displayName(),
+          })
+        : translateText("crownfall.alliance.req_defense_aid", {
+            name: requestor.displayName(),
+          });
+    } else {
+      description = translateText("crownfall.alliance.req_reinforcements", {
+        name: requestor.displayName(),
+      });
+    }
+
+    this.eventBus.emit(new PlaySoundEffectEvent("alliance-suggested"));
+    this.addEvent({
+      description,
+      buttons: [
+        {
+          text: translateText("events_display.focus"),
+          className: "btn-gray",
+          action: () =>
+            this.eventBus.emit(new GoToPlayerEvent(target ?? requestor)),
+          preventClose: true,
+        },
+        {
+          text: translateText("crownfall.alliance.accept"),
+          className: "btn",
+          action: () => {
+            this.eventBus.emit(new PlaySoundEffectEvent("alliance-accepted"));
+            this.eventBus.emit(
+              new SendAllianceActionReplyIntentEvent(update.requestID, true),
+            );
+          },
+        },
+        {
+          text: translateText("crownfall.alliance.decline"),
+          className: "btn-info",
+          action: () => {
+            this.eventBus.emit(
+              new SendAllianceActionReplyIntentEvent(update.requestID, false),
+            );
+          },
+        },
+      ],
+      type: MessageType.ALLIANCE_ACCEPTED,
+      createdAt: update.createdAt,
+      duration: Math.max(10, update.expiresAt - update.createdAt),
+      focusID: requestor.smallID(),
+      requestorID: requestor.smallID(),
+    });
+  }
+
+  onAllianceActionReplyEvent(_update: AllianceActionReplyUpdate) {
+    // Handled cleanly; requestor sees troop/attack updates directly on map & HUD.
   }
 
   onAllianceRequestEvent(update: AllianceRequestUpdate) {

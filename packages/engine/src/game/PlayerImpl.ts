@@ -2,14 +2,17 @@ import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
   AllianceInfo,
   AllPlayers,
+  AugmentId,
   BuildableUnit,
   Cell,
   ColoredTeams,
+  DevelopmentPath,
   EmojiMessage,
   GameMode,
   GameType,
   Gold,
   MAX_UPGRADE_AMOUNT,
+  NationalProject,
   PlayerBuildable,
   PlayerBuildableUnitType,
   PlayerID,
@@ -34,7 +37,22 @@ import {
 } from "@openfront/engine-api/game/GameUpdates";
 import { ReadonlyTileSet } from "@openfront/engine-api/game/ReadViews";
 import { ClientID } from "@openfront/engine-api/Schemas";
+import {
+  applyAugmentModifiers,
+  MAX_AUGMENTS_PER_PLAYER,
+} from "@openfront/engine-lib/configuration/CrownfallAugments";
 import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  computeCrownfallPathModifiers,
+  type CrownfallPathModifiers,
+  nextTierScienceCost,
+  type PathProgress,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
+import {
+  applyActiveProjectModifiers,
+  isProjectUnlocked,
+  NATIONAL_PROJECTS_BY_ID,
+} from "@openfront/engine-lib/configuration/CrownfallProjects";
 import { andFN, manhattanDistFN } from "@openfront/engine-lib/game/GameMapImpl";
 import { TileSet } from "@openfront/engine-lib/game/TileSet";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
@@ -115,6 +133,7 @@ class Donation {
 // (Set.add ignores freeze) — EMPTY_EMBARGOES must never be mutated.
 const EMPTY_NUMBER_ARRAY: number[] = [];
 const EMPTY_STRING_ARRAY: string[] = [];
+const EMPTY_AUGMENT_ARRAY: AugmentId[] = [];
 const EMPTY_ATTACK_UPDATES: AttackUpdate[] = [];
 const EMPTY_ALLIANCE_VIEWS: AllianceView[] = [];
 const EMPTY_EMOJIS: EmojiMessage[] = [];
@@ -129,6 +148,7 @@ const SHORE_DIRECTIONS_DX = [0, 0, -1, 1];
 const SHORE_DIRECTIONS_DY = [-1, 1, 0, 0];
 Object.freeze(EMPTY_NUMBER_ARRAY);
 Object.freeze(EMPTY_STRING_ARRAY);
+Object.freeze(EMPTY_AUGMENT_ARRAY);
 Object.freeze(EMPTY_ATTACK_UPDATES);
 Object.freeze(EMPTY_ALLIANCE_VIEWS);
 Object.freeze(EMPTY_EMOJIS);
@@ -147,7 +167,18 @@ export class PlayerImpl implements Player {
   private _civilianPopulation: number = CROWNFALL_CONFIG.startingCivilianPop;
   private _science: number = 0;
   private _stability: number = CROWNFALL_CONFIG.startingStability;
+  private _rebellionMeter: number = 0;
+  private _rebellionCooldownTicks: number = 0;
+  private _activeProject: NationalProject | null = null;
+  private _activeProjectExpiresTick: number = 0;
+  private _projectCooldownUntilTick: number = 0;
   private _taxRate: TaxRate = TaxRate.Normal;
+  private _primaryPath: DevelopmentPath | null = null;
+  private _militaryLevel: number = 0;
+  private _politicalLevel: number = 0;
+  private _scientificLevel: number = 0;
+  private _selectedAugments: AugmentId[] = [];
+  private _pendingAugmentChoices: AugmentId[] = [];
 
   /** Cumulative ship-trade revenue (arrival credit for src + dst port owners). */
   private _tradeGold: bigint = 0n;
@@ -427,7 +458,23 @@ export class PlayerImpl implements Player {
       civilianPopulation: this._civilianPopulation,
       science: this._science,
       stability: this._stability,
+      rebellionMeter: this._rebellionMeter,
+      activeProject: this._activeProject,
+      activeProjectExpiresTick: this._activeProjectExpiresTick,
+      projectCooldownUntilTick: this._projectCooldownUntilTick,
       taxRate: this._taxRate,
+      primaryPath: this._primaryPath,
+      militaryLevel: this._militaryLevel,
+      politicalLevel: this._politicalLevel,
+      scientificLevel: this._scientificLevel,
+      selectedAugments:
+        this._selectedAugments.length === 0
+          ? EMPTY_AUGMENT_ARRAY
+          : this._selectedAugments.slice(),
+      pendingAugmentChoices:
+        this._pendingAugmentChoices.length === 0
+          ? EMPTY_AUGMENT_ARRAY
+          : this._pendingAugmentChoices.slice(),
     };
   }
 
@@ -1894,6 +1941,91 @@ export class PlayerImpl implements Player {
     );
   }
 
+  rebellionMeter(): number {
+    return this._rebellionMeter;
+  }
+
+  setRebellionMeter(meter: number): void {
+    this._rebellionMeter = Math.max(0, Math.min(100, Math.trunc(meter)));
+  }
+
+  rebellionCooldownTicks(): number {
+    return this._rebellionCooldownTicks;
+  }
+
+  setRebellionCooldownTicks(ticks: number): void {
+    this._rebellionCooldownTicks = Math.max(0, Math.trunc(ticks));
+  }
+
+  activeProject(): NationalProject | null {
+    if (
+      this._activeProject !== null &&
+      this.mg.ticks() >= this._activeProjectExpiresTick
+    ) {
+      return null;
+    }
+    return this._activeProject;
+  }
+
+  activeProjectExpiresTick(): number {
+    return this._activeProjectExpiresTick;
+  }
+
+  projectCooldownUntilTick(): number {
+    return this._projectCooldownUntilTick;
+  }
+
+  clearExpiredProject(currentTick: number): void {
+    if (
+      this._activeProject !== null &&
+      currentTick >= this._activeProjectExpiresTick
+    ) {
+      this._activeProject = null;
+      this._activeProjectExpiresTick = 0;
+    }
+  }
+
+  activateNationalProject(project: NationalProject): boolean {
+    if (!this.isAlive()) return false;
+    const now = this.mg.ticks();
+    this.clearExpiredProject(now);
+    if (this._activeProject !== null) return false;
+    if (now < this._projectCooldownUntilTick) return false;
+    if (!isProjectUnlocked(this.pathProgress(), project)) return false;
+
+    const def = NATIONAL_PROJECTS_BY_ID[project];
+    if (this._science < def.scienceCost) return false;
+    if (this._gold < def.goldCost) return false;
+
+    this._science -= def.scienceCost;
+    this.removeGold(def.goldCost);
+
+    if (def.mobilisationCapPercent > 0) {
+      const cap = this.mg.config().maxTroops(this);
+      const reserve = Math.min(
+        def.mobilisationMaxTroops,
+        Math.floor((cap * def.mobilisationCapPercent) / 100),
+      );
+      if (reserve > 0) {
+        this.addTroops(reserve);
+      }
+    }
+
+    if (def.immediateStabilityDelta !== 0) {
+      this.setStability(this._stability + def.immediateStabilityDelta);
+    }
+    if (def.immediateRebellionDelta !== 0) {
+      this.setRebellionMeter(
+        this._rebellionMeter + def.immediateRebellionDelta,
+      );
+    }
+
+    this._activeProject = project;
+    this._activeProjectExpiresTick = now + def.durationTicks;
+    this._projectCooldownUntilTick = now + def.cooldownTicks;
+    return true;
+  }
+
   taxRate(): TaxRate {
     return this._taxRate;
   }
@@ -1902,9 +2034,117 @@ export class PlayerImpl implements Player {
     this._taxRate = taxRate;
   }
 
+  primaryPath(): DevelopmentPath | null {
+    return this._primaryPath;
+  }
+
+  setPrimaryPath(path: DevelopmentPath): boolean {
+    if (this._primaryPath !== null) {
+      return false;
+    }
+    this._primaryPath = path;
+    return true;
+  }
+
+  devLevel(path: DevelopmentPath): number {
+    switch (path) {
+      case DevelopmentPath.Military:
+        return this._militaryLevel;
+      case DevelopmentPath.Political:
+        return this._politicalLevel;
+      case DevelopmentPath.Scientific:
+        return this._scientificLevel;
+    }
+  }
+
+  pathProgress(): PathProgress {
+    return {
+      primaryPath: this._primaryPath,
+      militaryLevel: this._militaryLevel,
+      politicalLevel: this._politicalLevel,
+      scientificLevel: this._scientificLevel,
+    };
+  }
+
+  pathModifiers(): CrownfallPathModifiers {
+    return applyActiveProjectModifiers(
+      applyAugmentModifiers(
+        computeCrownfallPathModifiers(this.pathProgress()),
+        this._selectedAugments,
+      ),
+      this.activeProject(),
+    );
+  }
+
+  selectedAugments(): readonly AugmentId[] {
+    return this._selectedAugments;
+  }
+
+  pendingAugmentChoices(): readonly AugmentId[] {
+    return this._pendingAugmentChoices;
+  }
+
+  offerAugmentChoices(choices: AugmentId[]): void {
+    if (this._selectedAugments.length >= MAX_AUGMENTS_PER_PLAYER) {
+      this._pendingAugmentChoices = [];
+      return;
+    }
+    this._pendingAugmentChoices = choices.slice();
+  }
+
+  selectAugment(id: AugmentId): boolean {
+    if (this._selectedAugments.length >= MAX_AUGMENTS_PER_PLAYER) {
+      this._pendingAugmentChoices = [];
+      return false;
+    }
+    if (!this._pendingAugmentChoices.includes(id)) {
+      return false;
+    }
+    if (this._selectedAugments.includes(id)) {
+      return false;
+    }
+    this._selectedAugments.push(id);
+    this._pendingAugmentChoices = [];
+    return true;
+  }
+
+  unlockDevTier(path: DevelopmentPath): boolean {
+    const cost = nextTierScienceCost(this.pathProgress(), path);
+    if (cost === null || this._science < cost) {
+      return false;
+    }
+    this._science -= cost;
+    switch (path) {
+      case DevelopmentPath.Military:
+        this._militaryLevel++;
+        break;
+      case DevelopmentPath.Political:
+        this._politicalLevel++;
+        break;
+      case DevelopmentPath.Scientific:
+        this._scientificLevel++;
+        break;
+    }
+    return true;
+  }
+
   hash(): number {
     const taxHash =
       this._taxRate === TaxRate.Low ? 1 : this._taxRate === TaxRate.High ? 3 : 2;
+    const pathHash =
+      (this._primaryPath === DevelopmentPath.Military
+        ? 1
+        : this._primaryPath === DevelopmentPath.Political
+          ? 2
+          : this._primaryPath === DevelopmentPath.Scientific
+            ? 3
+            : 0) +
+      this._militaryLevel * 5 +
+      this._politicalLevel * 25 +
+      this._scientificLevel * 125;
+    const augHash =
+      this._selectedAugments.reduce((acc, id) => acc + simpleHash(id), 0) +
+      this._pendingAugmentChoices.reduce((acc, id) => acc + simpleHash(id), 0);
     return (
       simpleHash(this.id()) *
         (this.troops() +
@@ -1912,7 +2152,14 @@ export class PlayerImpl implements Player {
           this._civilianPopulation +
           this._science +
           this._stability * 7 +
-          taxHash) +
+          this._rebellionMeter * 13 +
+          this._rebellionCooldownTicks * 3 +
+          (this._activeProject ? simpleHash(this._activeProject) : 0) +
+          this._activeProjectExpiresTick * 5 +
+          this._projectCooldownUntilTick * 11 +
+          taxHash +
+          pathHash +
+          augHash) +
       this._units.reduce((acc, unit) => acc + unit.hash(), 0)
     );
   }
@@ -2099,6 +2346,23 @@ export class PlayerImpl implements Player {
       science: this._science,
       stability: this._stability,
       taxRate: this._taxRate,
+      primaryPath: this._primaryPath,
+      militaryLevel: this._militaryLevel,
+      politicalLevel: this._politicalLevel,
+      scientificLevel: this._scientificLevel,
+      selectedAugments:
+        this._selectedAugments.length === 0
+          ? EMPTY_AUGMENT_ARRAY
+          : this._selectedAugments.slice(),
+      pendingAugmentChoices:
+        this._pendingAugmentChoices.length === 0
+          ? EMPTY_AUGMENT_ARRAY
+          : this._pendingAugmentChoices.slice(),
+      rebellionMeter: this._rebellionMeter,
+      rebellionCooldownTicks: this._rebellionCooldownTicks,
+      activeProject: this._activeProject,
+      activeProjectExpiresTick: this._activeProjectExpiresTick,
+      projectCooldownUntilTick: this._projectCooldownUntilTick,
     };
   }
 
@@ -2176,13 +2440,24 @@ export class PlayerImpl implements Player {
     this._science = s.science;
     this._stability = s.stability;
     this._taxRate = s.taxRate;
+    this._primaryPath = s.primaryPath;
+    this._militaryLevel = s.militaryLevel;
+    this._politicalLevel = s.politicalLevel;
+    this._scientificLevel = s.scientificLevel;
+    this._selectedAugments = s.selectedAugments.slice();
+    this._pendingAugmentChoices = s.pendingAugmentChoices.slice();
+    this._rebellionMeter = s.rebellionMeter;
+    this._rebellionCooldownTicks = s.rebellionCooldownTicks;
+    this._activeProject = s.activeProject;
+    this._activeProjectExpiresTick = s.activeProjectExpiresTick;
+    this._projectCooldownUntilTick = s.projectCooldownUntilTick;
     this.nearbyMemo = null;
   }
 }
 
 export const PlayerSnapshot = snapshotType({
   name: "Player",
-  version: 2,
+  version: 6,
   migrations: {
     1: (d: Record<string, unknown>) => ({
       ...d,
@@ -2190,6 +2465,29 @@ export const PlayerSnapshot = snapshotType({
       science: 0,
       stability: CROWNFALL_CONFIG.startingStability,
       taxRate: TaxRate.Normal,
+    }),
+    2: (d: Record<string, unknown>) => ({
+      ...d,
+      primaryPath: null,
+      militaryLevel: 0,
+      politicalLevel: 0,
+      scientificLevel: 0,
+    }),
+    3: (d: Record<string, unknown>) => ({
+      ...d,
+      selectedAugments: [],
+      pendingAugmentChoices: [],
+    }),
+    4: (d: Record<string, unknown>) => ({
+      ...d,
+      rebellionMeter: 0,
+      rebellionCooldownTicks: 0,
+    }),
+    5: (d: Record<string, unknown>) => ({
+      ...d,
+      activeProject: null,
+      activeProjectExpiresTick: 0,
+      projectCooldownUntilTick: 0,
     }),
   },
   schema: z.object({
@@ -2259,6 +2557,17 @@ export const PlayerSnapshot = snapshotType({
     science: zInt(),
     stability: zInt(),
     taxRate: z.enum(TaxRate),
+    primaryPath: z.enum(DevelopmentPath).nullable(),
+    militaryLevel: zInt(),
+    politicalLevel: zInt(),
+    scientificLevel: zInt(),
+    selectedAugments: z.array(z.enum(AugmentId)),
+    pendingAugmentChoices: z.array(z.enum(AugmentId)),
+    rebellionMeter: zInt(),
+    rebellionCooldownTicks: zInt(),
+    activeProject: z.enum(NationalProject).nullable(),
+    activeProjectExpiresTick: zInt(),
+    projectCooldownUntilTick: zInt(),
   }),
 });
 export type PlayerState = z.infer<typeof PlayerSnapshot.schema>;

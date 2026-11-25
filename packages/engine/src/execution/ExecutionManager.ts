@@ -7,6 +7,9 @@ import {
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { simpleHash } from "@openfront/engine-lib/Util";
 import { Execution, Game } from "../game/Game";
+import { ActivateNationalProjectExecution } from "./ActivateNationalProjectExecution";
+import { AllianceActionReplyExecution } from "./alliance/AllianceActionReplyExecution";
+import { AllianceActionRequestExecution } from "./alliance/AllianceActionRequestExecution";
 import { AllianceExtensionExecution } from "./alliance/AllianceExtensionExecution";
 import { AllianceRejectExecution } from "./alliance/AllianceRejectExecution";
 import { AllianceRequestExecution } from "./alliance/AllianceRequestExecution";
@@ -27,11 +30,14 @@ import { NoOpExecution } from "./NoOpExecution";
 import { PauseExecution } from "./PauseExecution";
 import { QuickChatExecution } from "./QuickChatExecution";
 import { RetreatExecution } from "./RetreatExecution";
+import { SelectAugmentExecution } from "./SelectAugmentExecution";
+import { SelectDevPathExecution } from "./SelectDevPathExecution";
 import { SetTaxRateExecution } from "./SetTaxRateExecution";
 import { SpawnExecution } from "./SpawnExecution";
 import { TargetPlayerExecution } from "./TargetPlayerExecution";
 import { TransportShipExecution } from "./TransportShipExecution";
 import { TribeSpawner } from "./TribeSpawner";
+import { UnlockDevTierExecution } from "./UnlockDevTierExecution";
 import { UpgradeStructureExecution } from "./UpgradeStructureExecution";
 import { PlayerSpawner } from "./utils/PlayerSpawner";
 
@@ -147,6 +153,27 @@ export class Executor {
         return new PauseExecution(player, intent.paused);
       case "set_tax_rate":
         return new SetTaxRateExecution(player, intent.taxRate);
+      case "select_dev_path":
+        return new SelectDevPathExecution(player, intent.path);
+      case "unlock_dev_tier":
+        return new UnlockDevTierExecution(player, intent.path);
+      case "select_augment":
+        return new SelectAugmentExecution(player, intent.augmentId);
+      case "alliance_action_request":
+        return new AllianceActionRequestExecution(
+          player,
+          intent.recipientID,
+          intent.actionType,
+          intent.targetID,
+        );
+      case "alliance_action_reply":
+        return new AllianceActionReplyExecution(
+          player,
+          intent.requestID,
+          intent.accept,
+        );
+      case "activate_national_project":
+        return new ActivateNationalProjectExecution(player, intent.project);
       default:
         throw new Error(`intent type ${intent} not found`);
     }

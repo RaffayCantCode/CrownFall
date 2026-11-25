@@ -25,6 +25,7 @@ import { FrameProfiler } from "./FrameProfiler";
 import { ActionableEvents } from "./layers/ActionableEvents";
 import { AlertFrame } from "./layers/AlertFrame";
 import { AttacksDisplay } from "./layers/AttacksDisplay";
+import { AugmentModal } from "./layers/AugmentModal";
 import { BuildMenu } from "./layers/BuildMenu";
 import { ChatDisplay } from "./layers/ChatDisplay";
 import { ChatModal } from "./layers/ChatModal";
@@ -34,6 +35,7 @@ import { EventsDisplay } from "./layers/EventsDisplay";
 import { GameLeftSidebar } from "./layers/GameLeftSidebar";
 import { GameRightSidebar } from "./layers/GameRightSidebar";
 import { HeadsUpMessage } from "./layers/HeadsUpMessage";
+import { HegemonyBanner } from "./layers/HegemonyBanner";
 import { ImmunityTimer } from "./layers/ImmunityTimer";
 import { InGamePromo } from "./layers/InGamePromo";
 import { MainRadialMenu } from "./layers/MainRadialMenu";
@@ -119,6 +121,14 @@ export function createRenderer(
   }
   nationalDashboard.eventBus = eventBus;
   nationalDashboard.game = game;
+  nationalDashboard.uiState = uiState;
+
+  const augmentModal = document.querySelector("augment-modal") as AugmentModal;
+  if (!(augmentModal instanceof AugmentModal)) {
+    console.error("AugmentModal element not found in the DOM");
+  }
+  augmentModal.eventBus = eventBus;
+  augmentModal.game = game;
 
   const eventsDisplay = document.querySelector(
     "events-display",
@@ -283,6 +293,14 @@ export function createRenderer(
   }
   headsUpMessage.game = game;
 
+  const hegemonyBanner = document.querySelector(
+    "hegemony-banner",
+  ) as HegemonyBanner;
+  if (!(hegemonyBanner instanceof HegemonyBanner)) {
+    console.error("hegemony banner not found");
+  }
+  hegemonyBanner.game = game;
+
   const performanceOverlay = document.querySelector(
     "performance-overlay",
   ) as PerformanceOverlay;
@@ -381,6 +399,7 @@ export function createRenderer(
     unitDisplay,
     gameRightSidebar,
     nationalDashboard,
+    augmentModal,
     controlPanel,
     playerInfo,
     winModal,
@@ -389,6 +408,7 @@ export function createRenderer(
     settingsModal,
     playerPanel,
     headsUpMessage,
+    hegemonyBanner,
     multiTabModal,
     inGamePromo,
     tutorialPanel,
@@ -409,6 +429,7 @@ export function createRenderer(
     unitDisplay,
     gameRightSidebar,
     nationalDashboard,
+    augmentModal,
     controlPanel,
     playerInfo,
     winModal,
@@ -417,6 +438,7 @@ export function createRenderer(
     settingsModal,
     playerPanel,
     headsUpMessage,
+    hegemonyBanner,
     multiTabModal,
     inGamePromo,
     tutorialPanel,

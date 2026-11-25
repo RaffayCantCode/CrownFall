@@ -2,13 +2,17 @@ import { zb } from "@openfront/zbin";
 import quickChatData from "resources/QuickChat.json";
 import { z } from "zod";
 import {
+  AllianceActionType,
   AllPlayers,
+  AugmentId,
+  DevelopmentPath,
   Difficulty,
   Duos,
   GameMapSize,
   GameMapType,
   GameMode,
   GameType,
+  NationalProject,
   HumansVsNations,
   MAX_UPGRADE_AMOUNT,
   Quads,
@@ -48,7 +52,13 @@ export type Intent =
   | TogglePauseIntent
   | UpdateGameConfigIntent
   | ToggleGameStartTimer
-  | SetTaxRateIntent;
+  | SetTaxRateIntent
+  | SelectDevPathIntent
+  | UnlockDevTierIntent
+  | SelectAugmentIntent
+  | AllianceActionRequestIntent
+  | AllianceActionReplyIntent
+  | ActivateNationalProjectIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -86,6 +96,18 @@ export type ToggleGameStartTimer = z.infer<
   typeof ToggleGameStartTimerIntentSchema
 >;
 export type SetTaxRateIntent = z.infer<typeof SetTaxRateIntentSchema>;
+export type SelectDevPathIntent = z.infer<typeof SelectDevPathIntentSchema>;
+export type UnlockDevTierIntent = z.infer<typeof UnlockDevTierIntentSchema>;
+export type SelectAugmentIntent = z.infer<typeof SelectAugmentIntentSchema>;
+export type AllianceActionRequestIntent = z.infer<
+  typeof AllianceActionRequestIntentSchema
+>;
+export type AllianceActionReplyIntent = z.infer<
+  typeof AllianceActionReplyIntentSchema
+>;
+export type ActivateNationalProjectIntent = z.infer<
+  typeof ActivateNationalProjectIntentSchema
+>;
 
 export type Turn = z.infer<typeof TurnSchema>;
 export type GameConfig = z.infer<typeof GameConfigSchema>;
@@ -230,6 +252,15 @@ export const OvertimeConfigSchema = z.object({
   startMinutes: zb.uint({ min: 1, max: 120 }).optional(),
 });
 
+// Stable Hegemony Victory (Crownfall Phase 7). When opponents remain alive,
+// crossing the territory threshold starts a countdown that requires maintaining
+// both territory and national stability (>= minStability).
+export const StableHegemonyConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  holdSeconds: zb.uint({ min: 1, max: 600 }).optional(),
+  minStability: zb.uint({ min: 0, max: 100 }).optional(),
+});
+
 // A lobby pool: several lobbies that arriving players are spread across, so
 // one advertised entry point can absorb more players than a single lobby
 // holds. Assignment is a hash of the joiner's identity (server/PoolRouting.ts),
@@ -269,6 +300,7 @@ export const GameConfigSchema = z.object({
   gameMapSize: z.enum(GameMapSize),
   doomsdayClock: DoomsdayClockConfigSchema.optional(),
   overtime: OvertimeConfigSchema.optional(),
+  stableHegemony: StableHegemonyConfigSchema.optional(),
   publicGameModifiers: z
     .object({
       isCompact: z.boolean().optional(),
@@ -575,6 +607,39 @@ export const SetTaxRateIntentSchema = z.object({
   taxRate: z.enum(TaxRate),
 });
 
+export const SelectDevPathIntentSchema = z.object({
+  type: z.literal("select_dev_path"),
+  path: z.enum(DevelopmentPath),
+});
+
+export const UnlockDevTierIntentSchema = z.object({
+  type: z.literal("unlock_dev_tier"),
+  path: z.enum(DevelopmentPath),
+});
+
+export const SelectAugmentIntentSchema = z.object({
+  type: z.literal("select_augment"),
+  augmentId: z.enum(AugmentId),
+});
+
+export const AllianceActionRequestIntentSchema = z.object({
+  type: z.literal("alliance_action_request"),
+  recipientID: ID,
+  actionType: z.enum(AllianceActionType),
+  targetID: ID.nullable(),
+});
+
+export const AllianceActionReplyIntentSchema = z.object({
+  type: z.literal("alliance_action_reply"),
+  requestID: zb.uint(),
+  accept: z.boolean(),
+});
+
+export const ActivateNationalProjectIntentSchema = z.object({
+  type: z.literal("activate_national_project"),
+  project: z.enum(NationalProject),
+});
+
 export const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
   CancelAttackIntentSchema,
@@ -602,6 +667,12 @@ export const IntentSchema = z.discriminatedUnion("type", [
   UpdateGameConfigIntentSchema,
   ToggleGameStartTimerIntentSchema,
   SetTaxRateIntentSchema,
+  SelectDevPathIntentSchema,
+  UnlockDevTierIntentSchema,
+  SelectAugmentIntentSchema,
+  AllianceActionRequestIntentSchema,
+  AllianceActionReplyIntentSchema,
+  ActivateNationalProjectIntentSchema,
 ]);
 
 // StampedIntent = Intent with server-stamped clientID (used in turns and execution)
