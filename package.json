@@ -1,5 +1,5 @@
 {
-  "name": "openfront-client",
+  "name": "crownfall",
   "engines": {
     "node": ">=24.15.0 <25",
     "npm": ">=12.1.0 <13"
@@ -10,6 +10,7 @@
   "scripts": {
     "build-dev": "concurrently \"tsc --noEmit\" \"vite build --mode development\"",
     "build-prod": "concurrently --kill-others-on-fail \"tsc --noEmit\" \"vite build\" && tsx scripts/buildAssetHashes.ts",
+    "build:cloudflare": "npm run build-prod && tsx scripts/prepareCloudflarePages.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p packages/engine-api && tsc --noEmit -p packages/engine-lib && tsc --noEmit -p packages/engine && tsc --noEmit -p packages/engine/src/worker && tsc --noEmit -p packages/shared && tsc --noEmit -p packages/zbin",
     "start:client": "vite",
     "start:server": "tsx src/server/Server.ts",
