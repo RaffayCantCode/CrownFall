@@ -22,6 +22,18 @@ const AUGMENT_ICON_FILES: Record<AugmentId, string> = {
   [AugmentId.BlitzLogistics]: "images/crownfall/aug-blitz-logistics.svg",
   [AugmentId.CivicRenaissance]: "images/crownfall/aug-civic-renaissance.svg",
   [AugmentId.IronDiscipline]: "images/crownfall/aug-iron-discipline.svg",
+  [AugmentId.ShockAndAwe]: "images/crownfall/aug-blitz-logistics.svg",
+  [AugmentId.GuerrillaDoctrine]: "images/crownfall/aug-fortress-nation.svg",
+  [AugmentId.NuclearDeterrence]: "images/crownfall/aug-aerospace-command.svg",
+  [AugmentId.MaritimeTradeEmpire]: "images/crownfall/aug-war-profiteers.svg",
+  [AugmentId.AusterityMeasures]: "images/crownfall/aug-industrial-powerhouse.svg",
+  [AugmentId.KeynesianBoom]: "images/crownfall/aug-civic-renaissance.svg",
+  [AugmentId.IronFistRule]: "images/crownfall/aug-iron-discipline.svg",
+  [AugmentId.WelfareState]: "images/crownfall/aug-peoples-first.svg",
+  [AugmentId.ImperialBureaucracy]: "images/crownfall/aug-golden-diplomacy.svg",
+  [AugmentId.CyberWarfare]: "images/crownfall/aug-technological-race.svg",
+  [AugmentId.QuantumTargeting]: "images/crownfall/aug-aerospace-command.svg",
+  [AugmentId.BlackBudgetLabs]: "images/crownfall/aug-technological-race.svg",
 };
 
 export function renderPathEmblem(path: DevelopmentPath): TemplateResult {

@@ -12,13 +12,15 @@ export const CROWNFALL_CRISIS_CONFIG = {
   crisisTaxPenaltyPercent: 65,
   rebellionTaxPenaltyPercent: 50,
 
-  /** Troop regeneration multiplier during Severe Crisis / Rebellion (percent). */
-  crisisTroopRegenPercent: 85,
+  /** Troop regeneration multiplier during Unrest / Crisis / Rebellion (percent). */
+  unrestTroopRegenPercent: 85,
+  crisisTroopRegenPercent: 65,
+  rebellionTroopRegenPercent: 45,
 
   /** Civilian emigration rate in basis points per second (10_000 = 100%). */
-  unrestEmigrationBps: 25, // 0.25%/sec
-  crisisEmigrationBps: 75, // 0.75%/sec
-  rebellionEmigrationBps: 120, // 1.20%/sec
+  unrestEmigrationBps: 35, // 0.35%/sec
+  crisisEmigrationBps: 90, // 0.90%/sec
+  rebellionEmigrationBps: 150, // 1.50%/sec
 
   /** Minimum stability a bordering nation needs to attract fleeing civilians. */
   stableNeighborMinStability: 65,
@@ -28,8 +30,8 @@ export const CROWNFALL_CRISIS_CONFIG = {
   /** Minimum owned tiles before a nation can suffer a territorial rebellion. */
   minTilesForRebellion: 80,
   /** Rebellion meter buildup per second while in Crisis (15..34) or Rebellion (<15). */
-  rebellionMeterGainCrisis: 3,
-  rebellionMeterGainCritical: 8,
+  rebellionMeterGainCrisis: 5,
+  rebellionMeterGainCritical: 12,
   /** Rebellion meter decay per second while Stable or Unrest (>=35). */
   rebellionMeterDecayPerSec: 5,
   /** Rebellion meter threshold that triggers an advance warning notification. */
@@ -51,8 +53,14 @@ export const CROWNFALL_CRISIS_CONFIG = {
  */
 export function crisisTroopRegenPercent(stability: number): number {
   const band: StabilityBand = stabilityBand(stability);
-  if (band === "crisis" || band === "rebellion") {
+  if (band === "rebellion") {
+    return CROWNFALL_CRISIS_CONFIG.rebellionTroopRegenPercent;
+  }
+  if (band === "crisis") {
     return CROWNFALL_CRISIS_CONFIG.crisisTroopRegenPercent;
+  }
+  if (band === "unrest") {
+    return CROWNFALL_CRISIS_CONFIG.unrestTroopRegenPercent;
   }
   return 100;
 }

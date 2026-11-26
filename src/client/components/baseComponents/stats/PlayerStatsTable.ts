@@ -24,6 +24,9 @@ const BUILDING_ORDER = {
   hous: 7,
   pubs: 8,
   resc: 9,
+  spyn: 10,
+  orbr: 11,
+  cybc: 12,
 } as const satisfies Record<
   Exclude<(typeof otherUnits)[number], "wshp">,
   number
@@ -46,6 +49,9 @@ const UNIT_LABEL_KEYS = {
   port: "unit_type.port",
   pubs: "unit_type.public_services",
   resc: "unit_type.research_centre",
+  spyn: "unit_type.spy_network",
+  orbr: "unit_type.orbital_radar",
+  cybc: "unit_type.cyber_command",
   saml: "unit_type.sam_launcher",
   silo: "unit_type.missile_silo",
   wshp: "unit_type.warship",

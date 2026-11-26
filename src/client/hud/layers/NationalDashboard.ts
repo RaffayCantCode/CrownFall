@@ -92,6 +92,9 @@ const scientificPathIcon = assetUrl("images/crownfall/path-scientific.svg");
 const housingIcon = assetUrl("images/HousingIconWhite.svg");
 const publicServicesIcon = assetUrl("images/PublicServicesIconWhite.svg");
 const researchCentreIcon = assetUrl("images/ResearchCentreIconWhite.svg");
+const spyNetworkIcon = assetUrl("images/crownfall/ops-emp.svg");
+const orbitalRadarIcon = samLauncherIcon;
+const cyberCommandIcon = scientificPathIcon;
 
 const PROJECT_ICONS: Record<NationalProject, string> = {
   [NationalProject.FrontlineConscription]: defensePostIcon,
@@ -169,6 +172,13 @@ const CIVIC_BUILDINGS: readonly BuildingMenuEntry[] = [
     icon: researchCentreIcon,
     counted: true,
   },
+  {
+    unitType: UnitType.SpyNetwork,
+    labelKey: "unit_type.spy_network",
+    roleKey: "crownfall.hud.role_spy_network",
+    icon: spyNetworkIcon,
+    counted: true,
+  },
 ];
 
 const MILITARY_BUILDINGS: readonly BuildingMenuEntry[] = [
@@ -235,6 +245,20 @@ const MILITARY_BUILDINGS: readonly BuildingMenuEntry[] = [
     counted: false,
     prereqUnit: UnitType.MissileSilo,
     prereqKey: "crownfall.hud.needs_silo",
+  },
+  {
+    unitType: UnitType.OrbitalRadar,
+    labelKey: "unit_type.orbital_radar",
+    roleKey: "crownfall.hud.role_orbital_radar",
+    icon: orbitalRadarIcon,
+    counted: true,
+  },
+  {
+    unitType: UnitType.CyberCommand,
+    labelKey: "unit_type.cyber_command",
+    roleKey: "crownfall.hud.role_cyber_command",
+    icon: cyberCommandIcon,
+    counted: true,
   },
 ];
 
@@ -401,28 +425,28 @@ export class NationalDashboard extends LitElement implements Controller {
     if (pos === "left") {
       const width =
         size === "narrow"
-          ? "w-80"
+          ? "w-72"
           : size === "medium"
-            ? "w-[min(calc(100vw-370px),660px)]"
-            : "w-[min(calc(100vw-370px),740px)]";
-      return `absolute bottom-0 left-full ml-3 ${width}`;
+            ? "w-[min(calc(100vw-340px),520px)]"
+            : "w-[min(calc(100vw-340px),580px)]";
+      return `absolute bottom-0 left-full ml-2.5 ${width}`;
     }
     if (pos === "right") {
       const width =
         size === "narrow"
-          ? "w-80"
+          ? "w-72"
           : size === "medium"
-            ? "w-[min(calc(100vw-370px),660px)]"
-            : "w-[min(calc(100vw-370px),740px)]";
-      return `absolute bottom-0 right-full mr-3 ${width}`;
+            ? "w-[min(calc(100vw-340px),520px)]"
+            : "w-[min(calc(100vw-340px),580px)]";
+      return `absolute bottom-0 right-full mr-2.5 ${width}`;
     }
     const width =
       size === "narrow"
-        ? "left-2 w-80"
+        ? "left-2 w-72"
         : size === "medium"
-          ? "left-1/2 -translate-x-1/2 w-[min(96vw,680px)]"
-          : "left-1/2 -translate-x-1/2 w-[min(96vw,780px)]";
-    return `absolute bottom-full mb-2.5 ${width}`;
+          ? "left-1/2 -translate-x-1/2 w-[min(94vw,540px)]"
+          : "left-1/2 -translate-x-1/2 w-[min(94vw,600px)]";
+    return `absolute bottom-full mb-2 ${width}`;
   }
 
   createRenderRoot() {
@@ -798,16 +822,29 @@ export class NationalDashboard extends LitElement implements Controller {
     return 0n;
   }
 
+  private unitScienceCost(unitType: UnitType): number {
+    for (const bu of this._playerBuildables) {
+      if (bu.type === unitType) return bu.scienceCost ?? 0;
+    }
+    return 0;
+  }
+
   private canBuildUnit(unitType: PlayerBuildableUnitType): boolean {
     if (!this.game || this.game.config().isUnitDisabled(unitType)) return false;
     if (this._playerBuildables.length === 0) return false;
     const myPlayer = this.game.myPlayer();
     if (!myPlayer) return false;
     const cost = this.unitCost(unitType);
-    if (cost <= 0n && !this._playerBuildables.some((b) => b.type === unitType)) {
+    const sciCost = this.unitScienceCost(unitType);
+    if (
+      cost <= 0n &&
+      sciCost <= 0 &&
+      !this._playerBuildables.some((b) => b.type === unitType)
+    ) {
       return false;
     }
     if (cost > myPlayer.gold()) return false;
+    if (sciCost > 0 && myPlayer.science() < sciCost) return false;
     switch (unitType) {
       case UnitType.AtomBomb:
       case UnitType.HydrogenBomb:
@@ -973,6 +1010,7 @@ export class NationalDashboard extends LitElement implements Controller {
   ) {
     if (this.game.config().isUnitDisabled(entry.unitType)) return nothing;
     const cost = this.unitCost(entry.unitType);
+    const sciCost = this.unitScienceCost(entry.unitType);
     const canAfford = this.canBuildUnit(entry.unitType);
     const selected = this._ghostStructure === entry.unitType;
     const count = entry.counted
@@ -992,40 +1030,40 @@ export class NationalDashboard extends LitElement implements Controller {
         type="button"
         @click=${() => this.selectBuildingForPlacement(entry.unitType)}
         ?disabled=${!canAfford && !selected}
-        class="group relative flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+        class="group relative flex items-center gap-2 rounded-lg border p-2 text-left transition-all ${
           selected
-            ? "border-[#f3d27a] bg-[#d4af37]/20 shadow-[0_0_16px_rgba(212,175,55,0.28)] cursor-pointer"
+            ? "border-[#f3d27a] bg-[#d4af37]/20 shadow-[0_0_12px_rgba(212,175,55,0.28)] cursor-pointer"
             : canAfford
               ? `${affordableBorder} cursor-pointer`
               : "border-white/[0.06] bg-[#0c1018]/75 opacity-55 cursor-not-allowed"
         }"
       >
         <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#080b12]"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-[#080b12]"
         >
           <img
             src=${entry.icon}
             alt=""
-            class="h-6 w-6 object-contain"
+            class="h-5 w-5 object-contain"
             draggable="false"
           />
         </div>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center justify-between gap-1.5">
-            <span class="truncate text-xs font-bold text-[#f4f1ea]">
+          <div class="flex items-center justify-between gap-1">
+            <span class="truncate text-[11px] font-bold text-[#f4f1ea]">
               ${translateText(entry.labelKey)}
             </span>
             ${
               count !== null
                 ? html`<span
-                    class="shrink-0 rounded bg-white/[0.08] px-1.5 py-0.5 text-[11px] font-mono text-[#e5e1d8]"
+                    class="shrink-0 rounded bg-white/[0.08] px-1 py-0.5 text-[10px] font-mono text-[#e5e1d8]"
                   >
                     ${count}
                   </span>`
                 : nothing
             }
           </div>
-          <div class="truncate text-[11px] text-[#9aa3b2] mt-0.5">
+          <div class="truncate text-[10px] text-[#9aa3b2]">
             ${
               missingPrereq && entry.prereqKey
                 ? html`<span class="text-amber-300/90 font-medium"
@@ -1034,19 +1072,29 @@ export class NationalDashboard extends LitElement implements Controller {
                 : translateText(entry.roleKey)
             }
           </div>
-          <div class="mt-1 flex items-center justify-between gap-1">
-            <span
-              class="inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
-                canAfford ? "text-[#f3d27a]" : "text-rose-300/80"
-              }"
-            >
-              <img src=${goldCoinIcon} width="11" height="11" alt="" />
-              ${renderNumber(cost)}
-            </span>
+          <div class="mt-0.5 flex items-center justify-between gap-1">
+            ${
+              sciCost > 0
+                ? html`<span
+                    class="inline-flex items-center gap-1 text-[11px] font-bold tabular-nums ${
+                      canAfford ? "text-sky-300" : "text-rose-300/80"
+                    }"
+                  >
+                    ${sciCost} SCI
+                  </span>`
+                : html`<span
+                    class="inline-flex items-center gap-1 text-[11px] font-bold tabular-nums ${
+                      canAfford ? "text-[#f3d27a]" : "text-rose-300/80"
+                    }"
+                  >
+                    <img src=${goldCoinIcon} width="10" height="10" alt="" />
+                    ${renderNumber(cost)}
+                  </span>`
+            }
             ${
               entry.hotkey
                 ? html`<span
-                    class="text-[10px] font-mono text-[#9aa3b2]/75 border border-white/10 rounded px-1.5"
+                    class="text-[9px] font-mono text-[#9aa3b2]/75 border border-white/10 rounded px-1"
                   >
                     ${entry.hotkey}
                   </span>`
@@ -1067,23 +1115,20 @@ export class NationalDashboard extends LitElement implements Controller {
     return html`
       <div
         class="${this.popoverPositionClass(
-          "wide",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-5 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+          "medium",
+        )} rounded-xl border border-[#d4af37]/40 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
       >
         <div
-          class="flex items-center justify-between border-b border-white/10 pb-3 mb-3.5"
+          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5"
         >
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
+            <span class="text-xs font-bold tracking-wider uppercase text-[#f3d27a]">
               ${translateText("crownfall.hud.buildings_title")}
-            </span>
-            <span class="text-xs text-[#9aa3b2]">
-              ${translateText("crownfall.hud.buildings_subtitle")}
             </span>
             ${
               costPercent < 100
                 ? html`<span
-                    class="rounded-md border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300"
+                    class="rounded border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300"
                   >
                     −${100 - costPercent}% Cost
                   </span>`
@@ -1093,13 +1138,13 @@ export class NationalDashboard extends LitElement implements Controller {
           <button
             type="button"
             @click=${() => this.togglePanel("buildings")}
-            class="text-slate-400 hover:text-white px-2 py-0.5 text-base cursor-pointer"
+            class="text-slate-400 hover:text-white px-1.5 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[60dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[40dvh] overflow-y-auto pr-1">
           ${CIVIC_BUILDINGS.map((b) =>
             this.renderBuildingCard(b, myPlayer, "civic"),
           )}
@@ -1117,23 +1162,20 @@ export class NationalDashboard extends LitElement implements Controller {
     return html`
       <div
         class="${this.popoverPositionClass(
-          "wide",
-        )} rounded-2xl border border-rose-500/45 bg-[#080b12]/98 p-5 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+          "medium",
+        )} rounded-xl border border-rose-500/45 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
       >
         <div
-          class="flex items-center justify-between border-b border-white/10 pb-3 mb-3.5"
+          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5"
         >
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-bold tracking-wider uppercase text-rose-300">
+            <span class="text-xs font-bold tracking-wider uppercase text-rose-300">
               ${translateText("crownfall.hud.arsenal_title")}
-            </span>
-            <span class="text-xs text-[#9aa3b2]">
-              ${translateText("crownfall.hud.arsenal_subtitle")}
             </span>
             ${
               costPercent < 100
                 ? html`<span
-                    class="rounded-md border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300"
+                    class="rounded border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300"
                   >
                     −${100 - costPercent}% Cost
                   </span>`
@@ -1143,13 +1185,13 @@ export class NationalDashboard extends LitElement implements Controller {
           <button
             type="button"
             @click=${() => this.togglePanel("arsenal")}
-            class="text-slate-400 hover:text-white px-2 py-0.5 text-base cursor-pointer"
+            class="text-slate-400 hover:text-white px-1.5 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[60dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[40dvh] overflow-y-auto pr-1">
           ${MILITARY_BUILDINGS.map((b) =>
             this.renderBuildingCard(b, myPlayer, "arsenal"),
           )}
@@ -1175,10 +1217,10 @@ export class NationalDashboard extends LitElement implements Controller {
       <div
         class="${this.popoverPositionClass(
           "medium",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-4 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+        )} rounded-xl border border-[#d4af37]/40 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
       >
         <div
-          class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-2.5 mb-3"
+          class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2 mb-2.5"
         >
           <div>
             <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
@@ -1228,7 +1270,7 @@ export class NationalDashboard extends LitElement implements Controller {
             : nothing
         }
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 max-h-[42dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 max-h-[38dvh] overflow-y-auto pr-1">
           ${ALL_PATHS.map(({ path, icon, accentBorder, accentText, pipBg }) => {
             const level = pathLevelFor(this._progress, path);
             const maxTier = maxTierForPath(primary, path);
@@ -1247,7 +1289,7 @@ export class NationalDashboard extends LitElement implements Controller {
 
             return html`
               <div
-                class="flex flex-col justify-between rounded-xl border p-4 bg-[#101622] ${isPrimary
+                class="flex flex-col justify-between rounded-lg border p-2.5 bg-[#101622] ${isPrimary
                   ? `${accentBorder} ring-1 ring-[#d4af37]/35`
                   : "border-white/10"}"
               >
@@ -1367,17 +1409,23 @@ export class NationalDashboard extends LitElement implements Controller {
 
   private getDisplayedProjects(): readonly NationalProjectDefinition[] {
     if (this._progress.primaryPath === null) {
-      // No primary chosen yet — show first 6 projects
-      return ALL_NATIONAL_PROJECTS.slice(0, 6);
+      // No primary chosen yet — show 1 flagship T1 operation per path (3 total)
+      return [
+        ALL_NATIONAL_PROJECTS.find(
+          (p) => p.requiredPath === DevelopmentPath.Military,
+        )!,
+        ALL_NATIONAL_PROJECTS.find(
+          (p) => p.requiredPath === DevelopmentPath.Political,
+        )!,
+        ALL_NATIONAL_PROJECTS.find(
+          (p) => p.requiredPath === DevelopmentPath.Scientific,
+        )!,
+      ];
     }
     const primary = this._progress.primaryPath;
-    // Show all 4 signature operations of your chosen Primary Path PLUS any
-    // cross-path operations you unlocked on Secondary Paths (capped at 6).
     return ALL_NATIONAL_PROJECTS.filter(
-      (def) =>
-        def.requiredPath === primary ||
-        isProjectUnlocked(this._progress, def.id),
-    ).slice(0, 6);
+      (def) => def.requiredPath === primary,
+    ).slice(0, 3);
   }
 
   private renderOpsPanel() {
@@ -1427,7 +1475,7 @@ export class NationalDashboard extends LitElement implements Controller {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[42dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-[38dvh] overflow-y-auto pr-1">
           ${displayedProjects.map((def) => {
             const unlocked = isProjectUnlocked(this._progress, def.id);
             const isActive = this._activeProject === def.id;
@@ -2170,23 +2218,23 @@ export class NationalDashboard extends LitElement implements Controller {
         : 0;
 
     const menuTabClass = (panel: OpenHudMenu, activeSpecial = false) =>
-      `relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide transition cursor-pointer ${
+      `relative inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] sm:text-xs font-semibold tracking-wide transition cursor-pointer ${
         activeSpecial
           ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
           : this._openPanel === panel
-            ? "border-[#f3d27a] bg-[#d4af37] text-[#080b12] shadow-[0_0_14px_rgba(212,175,55,0.3)]"
+            ? "border-[#f3d27a] bg-[#d4af37] text-[#080b12] shadow-[0_0_10px_rgba(212,175,55,0.3)]"
             : "border-white/15 bg-[#101622] text-[#f4f1ea] hover:border-[#d4af37]/60 hover:text-[#f3d27a]"
       }`;
 
     const dockGridClass = isSideRail
-      ? "grid grid-cols-2 gap-2"
+      ? "grid grid-cols-2 gap-1.5"
       : pathsEnabled
-        ? "grid grid-cols-3 sm:grid-cols-5 gap-2"
-        : "grid grid-cols-3 gap-2";
+        ? "grid grid-cols-3 sm:grid-cols-5 gap-1.5"
+        : "grid grid-cols-3 gap-1.5";
 
     return html`
       <div
-        class="relative border-t border-white/[0.08] px-3 py-2 text-sm text-slate-100 select-none"
+        class="relative border-t border-white/[0.08] px-2.5 py-1.5 text-xs text-slate-100 select-none"
       >
         <!-- Live Diplomatic Reply Toast Banner (removed — notifications appear in bottom-right events panel) -->
 
@@ -2194,21 +2242,21 @@ export class NationalDashboard extends LitElement implements Controller {
         ${this.renderArsenalPanel()} ${this.renderPathsPanel()}
         ${this.renderOpsPanel()} ${this.renderAlliancesPanel()}
 
-        <!-- Top Strip: Larger, Crisp National Vitals -->
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-          <div class="flex flex-wrap items-center gap-4">
+        <!-- Top Strip: Compact National Vitals -->
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <div class="flex flex-wrap items-center gap-3">
             <!-- Civilians -->
             <div
-              class="flex items-center gap-1.5"
+              class="flex items-center gap-1"
               title="${translateText("crownfall.civilians_tooltip")}"
             >
-              <span class="text-[#f3d27a] font-bold text-xs tracking-wider">
+              <span class="text-[#f3d27a] font-bold text-[11px] tracking-wider">
                 ${translateText("crownfall.civilians_short")}
               </span>
-              <span class="font-mono font-bold text-sm text-white">
+              <span class="font-mono font-bold text-xs text-white">
                 ${renderNumber(this._civilians)}
               </span>
-              <span class="text-xs text-[#9aa3b2] font-mono">
+              <span class="text-[11px] text-[#9aa3b2] font-mono">
                 /${renderNumber(this._civilianCap)}
               </span>
             </div>
@@ -2217,11 +2265,11 @@ export class NationalDashboard extends LitElement implements Controller {
             <button
               type="button"
               @click=${() => this.togglePanel("stability")}
-              class="flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-sm transition hover:brightness-110 cursor-pointer ${bandColor}"
+              class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition hover:brightness-110 cursor-pointer ${bandColor}"
               title="${translateText("crownfall.stability_tooltip")}"
             >
               <span class="font-bold">${this._stability}%</span>
-              <span class="text-xs uppercase tracking-wider font-semibold">
+              <span class="text-[10px] uppercase tracking-wider font-semibold">
                 ${translateText(`crownfall.band_${band}`)}
               </span>
               <span class="font-bold ${trendColor}">${trend}</span>
@@ -2229,7 +2277,7 @@ export class NationalDashboard extends LitElement implements Controller {
 
             ${this._rebellionMeter > 0
               ? html`<div
-                  class="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-600/20 px-2.5 py-0.5 text-xs font-bold text-red-200 ${this
+                  class="flex items-center gap-1 rounded-md border border-red-500/60 bg-red-600/20 px-2 py-0.5 text-[11px] font-bold text-red-200 ${this
                     ._rebellionMeter >= 50
                     ? "animate-pulse"
                     : ""}"
@@ -2242,17 +2290,17 @@ export class NationalDashboard extends LitElement implements Controller {
 
             <!-- Science -->
             <div
-              class="flex items-center gap-1.5"
+              class="flex items-center gap-1"
               title="${translateText("crownfall.science_tooltip")}"
             >
-              <span class="text-sky-300 font-bold text-xs tracking-wider">
+              <span class="text-sky-300 font-bold text-[11px] tracking-wider">
                 ${translateText("crownfall.science_short")}
               </span>
-              <span class="font-mono font-bold text-sm text-sky-100">
+              <span class="font-mono font-bold text-xs text-sky-100">
                 ${renderNumber(this._science)}
               </span>
               ${this._scienceRate > 0
-                ? html`<span class="text-xs font-semibold text-sky-400"
+                ? html`<span class="text-[11px] font-semibold text-sky-400"
                     >+${this._scienceRate}/s</span
                   >`
                 : nothing}

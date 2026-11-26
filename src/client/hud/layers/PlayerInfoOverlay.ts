@@ -8,6 +8,7 @@ import {
 import { AllianceView } from "@openfront/engine-api/game/GameUpdates";
 import { UnitLike } from "@openfront/engine-api/game/ReadViews";
 import { renderNumber, renderTroops } from "@openfront/engine-lib/Format";
+import { completedStructureLevels } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { assetUrl } from "@openfront/shared/AssetUrls";
 import {
   EventBus,
@@ -797,6 +798,7 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
             )}
             ${this.displayUnitCount(player, UnitType.Warship, warshipIcon)}
           </div>
+          ${this.renderSpyIntelStrip(player, myPlayer)}
         </div>
         ${
           myPlayer && this.showShortcutButtons()
@@ -805,6 +807,38 @@ export class PlayerInfoOverlay extends LitElement implements Controller {
         }
       </div>
     `;
+  }
+
+  private renderSpyIntelStrip(
+    player: PlayerView,
+    myPlayer: PlayerView | null,
+  ): TemplateResult | string {
+    if (!myPlayer || player === myPlayer || player.type() === PlayerType.Bot) {
+      return "";
+    }
+    const spyLevels = completedStructureLevels(myPlayer, UnitType.SpyNetwork);
+    if (spyLevels <= 0) {
+      return html`<div class="mt-0.5 text-[10px] text-slate-400/80 font-mono">
+        🔒 Build Spy Network for intel
+      </div>`;
+    }
+    const prog = player.pathProgress();
+    const pathLabel = prog.primaryPath
+      ? translateText(`crownfall.path.${prog.primaryPath}.name`)
+      : "None";
+    const silos = player.totalUnitLevels(UnitType.MissileSilo);
+    return html`<div
+      class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded bg-sky-950/60 border border-sky-400/30 px-1.5 py-0.5 text-[10px] font-mono text-sky-200"
+    >
+      <span class="text-sky-300 font-bold">INTEL</span>
+      <span>Stab ${player.stability()}%</span>
+      <span>Sci ${renderNumber(player.science())}</span>
+      <span>Path: ${pathLabel}</span>
+      <span>Silos ${silos}</span>
+      ${spyLevels >= 2
+        ? html`<span>Reb ${player.rebellionMeter()}%</span>`
+        : ""}
+    </div>`;
   }
 
   // Right side: what I can do to the player, each with its keybind. Request

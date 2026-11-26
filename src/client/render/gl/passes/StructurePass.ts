@@ -17,14 +17,17 @@
 import type { GhostPreviewData, RendererConfig, UnitState } from "../../types";
 import {
   UT_CITY,
+  UT_CYBER_COMMAND,
   UT_DEFENSE_POST,
   UT_FACTORY,
   UT_HOUSING,
   UT_MISSILE_SILO,
+  UT_ORBITAL_RADAR,
   UT_PORT,
   UT_PUBLIC_SERVICES,
   UT_RESEARCH_CENTRE,
   UT_SAM_LAUNCHER,
+  UT_SPY_NETWORK,
 } from "../../types";
 import { DynamicInstanceBuffer } from "../DynamicBuffer";
 import type { RenderSettings } from "../RenderSettings";
@@ -44,6 +47,9 @@ const EXTRA_STRUCTURE_ICON_URLS = [
   assetUrl("images/HousingIconWhite.svg"),
   assetUrl("images/PublicServicesIconWhite.svg"),
   assetUrl("images/ResearchCentreIconWhite.svg"),
+  assetUrl("images/crownfall/ops-emp.svg"),
+  assetUrl("images/SamLauncherIconWhite.svg"),
+  assetUrl("images/crownfall/path-scientific.svg"),
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -64,6 +70,9 @@ const STRUCTURE_ORDER = [
   UT_HOUSING,
   UT_PUBLIC_SERVICES,
   UT_RESEARCH_CENTRE,
+  UT_SPY_NETWORK,
+  UT_ORBITAL_RADAR,
+  UT_CYBER_COMMAND,
 ] as const;
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;

@@ -93,11 +93,11 @@ export const DEV_PATH_TIERS: Record<
   [DevelopmentPath.Military]: [
     {
       tier: 1,
-      baseScienceCost: 150,
-      baseGoldCost: 50_000n,
+      baseScienceCost: 250,
+      baseGoldCost: 100_000n,
       primaryOnly: false,
-      immediateReservePercent: 8,
-      immediateMaxTroops: 40_000,
+      immediateReservePercent: 10,
+      immediateMaxTroops: 50_000,
       immediateStabilityBonus: 0,
       immediateCivilianBonus: 0,
       nameKey: "crownfall.path.military.t1.name",
@@ -106,11 +106,11 @@ export const DEV_PATH_TIERS: Record<
     },
     {
       tier: 2,
-      baseScienceCost: 350,
-      baseGoldCost: 100_000n,
+      baseScienceCost: 750,
+      baseGoldCost: 300_000n,
       primaryOnly: false,
-      immediateReservePercent: 10,
-      immediateMaxTroops: 80_000,
+      immediateReservePercent: 12,
+      immediateMaxTroops: 100_000,
       immediateStabilityBonus: 0,
       immediateCivilianBonus: 0,
       nameKey: "crownfall.path.military.t2.name",
@@ -119,11 +119,11 @@ export const DEV_PATH_TIERS: Record<
     },
     {
       tier: 3,
-      baseScienceCost: 700,
-      baseGoldCost: 175_000n,
+      baseScienceCost: 2000,
+      baseGoldCost: 850_000n,
       primaryOnly: true,
-      immediateReservePercent: 12,
-      immediateMaxTroops: 140_000,
+      immediateReservePercent: 15,
+      immediateMaxTroops: 180_000,
       immediateStabilityBonus: 0,
       immediateCivilianBonus: 0,
       nameKey: "crownfall.path.military.t3.name",
@@ -132,11 +132,11 @@ export const DEV_PATH_TIERS: Record<
     },
     {
       tier: 4,
-      baseScienceCost: 1200,
-      baseGoldCost: 275_000n,
+      baseScienceCost: 4500,
+      baseGoldCost: 2_200_000n,
       primaryOnly: true,
-      immediateReservePercent: 15,
-      immediateMaxTroops: 220_000,
+      immediateReservePercent: 20,
+      immediateMaxTroops: 300_000,
       immediateStabilityBonus: 0,
       immediateCivilianBonus: 0,
       nameKey: "crownfall.path.military.t4.name",
@@ -147,52 +147,52 @@ export const DEV_PATH_TIERS: Record<
   [DevelopmentPath.Political]: [
     {
       tier: 1,
-      baseScienceCost: 150,
-      baseGoldCost: 50_000n,
+      baseScienceCost: 250,
+      baseGoldCost: 100_000n,
       primaryOnly: false,
       immediateReservePercent: 0,
       immediateMaxTroops: 0,
-      immediateStabilityBonus: 8,
-      immediateCivilianBonus: 10_000,
+      immediateStabilityBonus: 10,
+      immediateCivilianBonus: 15_000,
       nameKey: "crownfall.path.political.t1.name",
       proKey: "crownfall.path.political.t1.pro",
       conKey: "crownfall.path.political.t1.con",
     },
     {
       tier: 2,
-      baseScienceCost: 350,
-      baseGoldCost: 100_000n,
+      baseScienceCost: 750,
+      baseGoldCost: 300_000n,
       primaryOnly: false,
       immediateReservePercent: 0,
       immediateMaxTroops: 0,
-      immediateStabilityBonus: 8,
-      immediateCivilianBonus: 20_000,
+      immediateStabilityBonus: 10,
+      immediateCivilianBonus: 30_000,
       nameKey: "crownfall.path.political.t2.name",
       proKey: "crownfall.path.political.t2.pro",
       conKey: "crownfall.path.political.t2.con",
     },
     {
       tier: 3,
-      baseScienceCost: 700,
-      baseGoldCost: 175_000n,
+      baseScienceCost: 2000,
+      baseGoldCost: 850_000n,
       primaryOnly: true,
-      immediateReservePercent: 8,
-      immediateMaxTroops: 100_000,
-      immediateStabilityBonus: 10,
-      immediateCivilianBonus: 35_000,
+      immediateReservePercent: 10,
+      immediateMaxTroops: 120_000,
+      immediateStabilityBonus: 12,
+      immediateCivilianBonus: 50_000,
       nameKey: "crownfall.path.political.t3.name",
       proKey: "crownfall.path.political.t3.pro",
       conKey: "crownfall.path.political.t3.con",
     },
     {
       tier: 4,
-      baseScienceCost: 1200,
-      baseGoldCost: 275_000n,
+      baseScienceCost: 4500,
+      baseGoldCost: 2_200_000n,
       primaryOnly: true,
-      immediateReservePercent: 10,
-      immediateMaxTroops: 150_000,
-      immediateStabilityBonus: 12,
-      immediateCivilianBonus: 50_000,
+      immediateReservePercent: 12,
+      immediateMaxTroops: 180_000,
+      immediateStabilityBonus: 15,
+      immediateCivilianBonus: 80_000,
       nameKey: "crownfall.path.political.t4.name",
       proKey: "crownfall.path.political.t4.pro",
       conKey: "crownfall.path.political.t4.con",
@@ -201,52 +201,52 @@ export const DEV_PATH_TIERS: Record<
   [DevelopmentPath.Scientific]: [
     {
       tier: 1,
-      baseScienceCost: 150,
-      baseGoldCost: 50_000n,
+      baseScienceCost: 250,
+      baseGoldCost: 100_000n,
       primaryOnly: false,
       immediateReservePercent: 0,
       immediateMaxTroops: 0,
       immediateStabilityBonus: 6,
-      immediateCivilianBonus: 5_000,
+      immediateCivilianBonus: 8_000,
       nameKey: "crownfall.path.scientific.t1.name",
       proKey: "crownfall.path.scientific.t1.pro",
       conKey: "crownfall.path.scientific.t1.con",
     },
     {
       tier: 2,
-      baseScienceCost: 350,
-      baseGoldCost: 100_000n,
+      baseScienceCost: 750,
+      baseGoldCost: 300_000n,
       primaryOnly: false,
       immediateReservePercent: 0,
       immediateMaxTroops: 0,
       immediateStabilityBonus: 6,
-      immediateCivilianBonus: 10_000,
+      immediateCivilianBonus: 15_000,
       nameKey: "crownfall.path.scientific.t2.name",
       proKey: "crownfall.path.scientific.t2.pro",
       conKey: "crownfall.path.scientific.t2.con",
     },
     {
       tier: 3,
-      baseScienceCost: 700,
-      baseGoldCost: 175_000n,
+      baseScienceCost: 2000,
+      baseGoldCost: 850_000n,
       primaryOnly: true,
-      immediateReservePercent: 8,
-      immediateMaxTroops: 90_000,
+      immediateReservePercent: 10,
+      immediateMaxTroops: 110_000,
       immediateStabilityBonus: 0,
-      immediateCivilianBonus: 15_000,
+      immediateCivilianBonus: 25_000,
       nameKey: "crownfall.path.scientific.t3.name",
       proKey: "crownfall.path.scientific.t3.pro",
       conKey: "crownfall.path.scientific.t3.con",
     },
     {
       tier: 4,
-      baseScienceCost: 1200,
-      baseGoldCost: 275_000n,
+      baseScienceCost: 4500,
+      baseGoldCost: 2_200_000n,
       primaryOnly: true,
-      immediateReservePercent: 10,
-      immediateMaxTroops: 140_000,
+      immediateReservePercent: 12,
+      immediateMaxTroops: 180_000,
       immediateStabilityBonus: 0,
-      immediateCivilianBonus: 25_000,
+      immediateCivilianBonus: 40_000,
       nameKey: "crownfall.path.scientific.t4.name",
       proKey: "crownfall.path.scientific.t4.pro",
       conKey: "crownfall.path.scientific.t4.con",
@@ -340,130 +340,130 @@ export function computeCrownfallPathModifiers(
   // --- Military Path: Blitzkrieg, Army Capacity & Arsenal Discounts ---
   const mil = progress.militaryLevel;
   if (mil >= 1) {
-    troopRegenPercent += 18;
-    maxTroopsPercent += 10;
-    attackSpeedPercent += 8;
-    stabilityTargetDelta -= 5;
-    scienceRatePercent -= 6;
+    troopRegenPercent += 22;
+    maxTroopsPercent += 15;
+    attackSpeedPercent += 12;
+    stabilityTargetDelta -= 6;
+    scienceRatePercent -= 8;
   }
   if (mil >= 2) {
-    troopRegenPercent += 7; // total +25%
-    maxTroopsPercent += 10; // total +20%
-    attackerLossPercent -= 14;
-    attackSpeedPercent += 8; // total +16%
-    structureCostPercent -= 10; // cheaper military & infrastructure builds
-    stabilityTargetDelta -= 3; // total -8
-    civilianTaxPercent -= 6;
-    overexpansionStrainPercent += 12;
+    troopRegenPercent += 13; // total +35%
+    maxTroopsPercent += 15; // total +30%
+    attackerLossPercent -= 18;
+    attackSpeedPercent += 12; // total +24%
+    structureCostPercent -= 12;
+    stabilityTargetDelta -= 4; // total -10
+    civilianTaxPercent -= 8;
+    overexpansionStrainPercent += 15;
   }
   if (mil >= 3) {
-    maxTroopsPercent += 12; // total +32%
-    attackerLossPercent -= 8; // total -22%
-    siloCooldownPercent -= 15; // faster missile silos
-    nukeSpeedPercent += 18; // supersonic ballistic delivery
-    structureCostPercent -= 5; // total -15%
-    stabilityTargetDelta -= 4; // total -12
-    scienceRatePercent -= 4; // total -10%
-    civilianTaxPercent -= 4; // total -10%
+    maxTroopsPercent += 15; // total +45%
+    attackerLossPercent -= 12; // total -30%
+    siloCooldownPercent -= 20;
+    nukeSpeedPercent += 22;
+    structureCostPercent -= 8; // total -20%
+    stabilityTargetDelta -= 5; // total -15
+    scienceRatePercent -= 6; // total -14%
+    civilianTaxPercent -= 6; // total -14%
   }
   if (mil >= 4) {
-    troopRegenPercent += 15; // total +40%
-    maxTroopsPercent += 13; // total +45%
-    attackerLossPercent -= 8; // total -30%
-    attackSpeedPercent += 12; // total +28%
-    siloCooldownPercent -= 10; // total -25% silo reload (75)
-    nukeSpeedPercent += 10; // total +28% missile speed (128)
-    structureCostPercent -= 5; // total -20%
-    stabilityTargetDelta -= 3; // total -15
-    overexpansionStrainPercent += 13; // total +25%
-    civilianTaxPercent -= 2; // total -12%
-    scienceRatePercent -= 4; // total -14%
+    troopRegenPercent += 20; // total +55%
+    maxTroopsPercent += 20; // total +65%
+    attackerLossPercent -= 12; // total -42%
+    attackSpeedPercent += 16; // total +40%
+    siloCooldownPercent -= 15; // total -35%
+    nukeSpeedPercent += 15; // total +37%
+    structureCostPercent -= 5; // total -25%
+    stabilityTargetDelta -= 5; // total -20
+    overexpansionStrainPercent += 15; // total +30%
+    civilianTaxPercent -= 4; // total -18%
+    scienceRatePercent -= 6; // total -20%
   }
 
   // --- Political Path: Imperial Treasury, Trade Wealth, Civic Discounts & Hegemony ---
   const pol = progress.politicalLevel;
   if (pol >= 1) {
-    stabilityTargetDelta += 12;
-    overexpansionStrainPercent -= 25;
-    civilianTaxPercent += 20;
-    tradeIncomePercent += 15;
-    attackSpeedPercent -= 4;
+    stabilityTargetDelta += 14;
+    overexpansionStrainPercent -= 30;
+    civilianTaxPercent += 30;
+    tradeIncomePercent += 25;
+    attackSpeedPercent -= 5;
   }
   if (pol >= 2) {
-    civilianTaxPercent += 20; // total +40%
-    tradeIncomePercent += 15; // total +30%
-    civilianGrowthPercent += 25;
-    defenderSlowPercent -= 15; // fortified sovereign borders
-    structureCostPercent -= 12;
-    attackSpeedPercent -= 2; // total -6%
-    attackerLossPercent += 4;
+    civilianTaxPercent += 30; // total +60%
+    tradeIncomePercent += 25; // total +50%
+    civilianGrowthPercent += 30;
+    defenderSlowPercent -= 20;
+    structureCostPercent -= 15;
+    attackSpeedPercent -= 3; // total -8%
+    attackerLossPercent += 5;
   }
   if (pol >= 3) {
-    stabilityTargetDelta += 8; // total +20
-    overexpansionStrainPercent -= 25; // total -50%
-    defenderSlowPercent -= 10; // total -25% invader speed
-    maxTroopsPercent += 15;
-    troopRegenPercent += 15; // civic volunteer levies
-    structureCostPercent -= 6; // total -18%
-    attackerLossPercent += 1; // total +5%
-    scienceRatePercent -= 6;
+    stabilityTargetDelta += 10; // total +24
+    overexpansionStrainPercent -= 25; // total -55%
+    defenderSlowPercent -= 15; // total -35%
+    maxTroopsPercent += 20;
+    troopRegenPercent += 20;
+    structureCostPercent -= 8; // total -23%
+    attackerLossPercent += 2; // total +7%
+    scienceRatePercent -= 8;
   }
   if (pol >= 4) {
-    stabilityTargetDelta += 8; // total +28
-    overexpansionStrainPercent -= 20; // total -70%
-    civilianTaxPercent += 25; // total +65%
-    tradeIncomePercent += 20; // total +50%
-    civilianGrowthPercent += 20; // total +45%
-    defenderSlowPercent -= 7; // total -32% invader speed
-    maxTroopsPercent += 10; // total +25%
-    structureCostPercent -= 7; // total -25%
-    attackSpeedPercent -= 2; // total -8%
-    scienceRatePercent -= 2; // total -8%
+    stabilityTargetDelta += 12; // total +36
+    overexpansionStrainPercent -= 25; // total -80%
+    civilianTaxPercent += 40; // total +100%
+    tradeIncomePercent += 35; // total +85%
+    civilianGrowthPercent += 25; // total +55%
+    defenderSlowPercent -= 10; // total -45%
+    maxTroopsPercent += 15; // total +35%
+    structureCostPercent -= 9; // total -32%
+    attackSpeedPercent -= 2; // total -10%
+    scienceRatePercent -= 2; // total -10%
   }
 
   // --- Scientific Path: Hyper-Tech, R&D Discounts, Precision Warfare & Sky Dominance ---
   const sci = progress.scientificLevel;
   if (sci >= 1) {
-    scienceRatePercent += 40;
-    defenderSlowPercent -= 10;
-    structureCostPercent -= 8;
+    scienceRatePercent += 50;
+    defenderSlowPercent -= 12;
+    structureCostPercent -= 10;
     troopRegenPercent -= 5;
-    civilianTaxPercent -= 4;
+    civilianTaxPercent -= 5;
   }
   if (sci >= 2) {
-    samRangePercent += 30;
-    samCooldownPercent -= 25;
-    attackerLossPercent -= 12; // precision targeting lowers combat losses
-    structureCostPercent -= 4; // total -12%
-    tradeIncomePercent += 10;
-    troopRegenPercent -= 1; // total -6%
-    civilianTaxPercent -= 2; // total -6%
+    samRangePercent += 35;
+    samCooldownPercent -= 30;
+    attackerLossPercent -= 15;
+    structureCostPercent -= 6; // total -16%
+    tradeIncomePercent += 15;
+    troopRegenPercent -= 2; // total -7%
+    civilianTaxPercent -= 3; // total -8%
   }
   if (sci >= 3) {
-    scienceRatePercent += 35; // total +75%
-    defenderSlowPercent -= 12; // total -22%
-    nukeBlastRadiusPercent += 14; // quantum warheads
-    siloCooldownPercent -= 12;
-    troopRegenPercent += 12; // drone logistics -> net +6% regen
-    maxTroopsPercent += 15;
-    structureCostPercent -= 6; // total -18%
+    scienceRatePercent += 50; // total +100%
+    defenderSlowPercent -= 15; // total -27%
+    nukeBlastRadiusPercent += 18;
+    siloCooldownPercent -= 15;
+    troopRegenPercent += 15; // net +8%
+    maxTroopsPercent += 20;
+    structureCostPercent -= 8; // total -24%
     stabilityTargetDelta -= 4;
     attackSpeedPercent -= 4;
   }
   if (sci >= 4) {
-    scienceRatePercent += 35; // total +110%
-    samRangePercent += 25; // total +55%
-    samCooldownPercent -= 20; // total -45%
-    incomingNukeSlowPercent -= 30; // orbital EW slows enemy missiles by 30% (70)
-    nukeBlastRadiusPercent += 8; // total +22% precision blast radius (122)
-    siloCooldownPercent -= 8; // total -20%
-    nukeSpeedPercent += 15;
-    attackerLossPercent -= 8; // total -20% precision strike losses
-    maxTroopsPercent += 10; // total +25%
-    structureCostPercent -= 4; // total -22%
-    tradeIncomePercent += 15; // total +25%
+    scienceRatePercent += 60; // total +160%
+    samRangePercent += 35; // total +70%
+    samCooldownPercent -= 25; // total -55%
+    incomingNukeSlowPercent -= 35;
+    nukeBlastRadiusPercent += 12; // total +30%
+    siloCooldownPercent -= 10; // total -25%
+    nukeSpeedPercent += 20;
+    attackerLossPercent -= 10; // total -25%
+    maxTroopsPercent += 15; // total +35%
+    structureCostPercent -= 6; // total -30%
+    tradeIncomePercent += 20; // total +35%
     stabilityTargetDelta -= 2; // total -6
-    civilianTaxPercent -= 4; // total -10%
+    civilianTaxPercent -= 4; // total -12%
   }
 
   return {

@@ -41,7 +41,10 @@ import {
   applyAugmentModifiers,
   MAX_AUGMENTS_PER_PLAYER,
 } from "@openfront/engine-lib/configuration/CrownfallAugments";
-import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  applyScienceBuildingModifiers,
+  CROWNFALL_CONFIG,
+} from "@openfront/engine-lib/configuration/CrownfallConfig";
 import {
   computeCrownfallPathModifiers,
   type CrownfallPathModifiers,
@@ -1472,7 +1475,9 @@ export class PlayerImpl implements Player {
       );
     }
 
-    const cost = this.mg.unitInfo(type).cost(this.mg, this);
+    const unitInfo = this.mg.unitInfo(type);
+    const cost = unitInfo.cost(this.mg, this);
+    const sciCost = unitInfo.scienceCost?.(this.mg, this) ?? 0;
     const b = new UnitImpl(
       type,
       this.mg,
@@ -1485,6 +1490,9 @@ export class PlayerImpl implements Player {
     this._myUnitsVersion++;
     this.recordUnitConstructed(type);
     this.removeGold(cost);
+    if (sciCost > 0) {
+      this.addScience(-sciCost);
+    }
     this.removeTroops("troops" in params ? (params.troops ?? 0) : 0);
     this.mg.addUpdate(b.toUpdate());
     this.mg.addUnit(b);
@@ -1525,8 +1533,13 @@ export class PlayerImpl implements Player {
     if (this.mg.config().isUnitDisabled(unitType)) {
       return false;
     }
-    const cost = knownCost ?? this.mg.unitInfo(unitType).cost(this.mg, this);
+    const info = this.mg.unitInfo(unitType);
+    const cost = knownCost ?? info.cost(this.mg, this);
     if (this._gold < cost) {
+      return false;
+    }
+    const sciCost = info.scienceCost?.(this.mg, this) ?? 0;
+    if (sciCost > 0 && this._science < sciCost) {
       return false;
     }
     if (unitType !== UnitType.MIRVWarhead && !this.isAlive()) {
@@ -1566,8 +1579,13 @@ export class PlayerImpl implements Player {
   }
 
   upgradeUnit(unit: Unit) {
-    const cost = this.mg.unitInfo(unit.type()).cost(this.mg, this);
+    const info = this.mg.unitInfo(unit.type());
+    const cost = info.cost(this.mg, this);
+    const sciCost = info.scienceCost?.(this.mg, this) ?? 0;
     this.removeGold(cost);
+    if (sciCost > 0) {
+      this.addScience(-sciCost);
+    }
     unit.increaseLevel();
     this.recordUnitConstructed(unit.type());
   }
@@ -1593,7 +1611,9 @@ export class PlayerImpl implements Player {
     for (let i = 0; i < len; i++) {
       const u = units[i];
 
-      const cost = config.unitInfo(u).cost(mg, this);
+      const unitInfo = config.unitInfo(u);
+      const cost = unitInfo.cost(mg, this);
+      const scienceCost = unitInfo.scienceCost?.(mg, this) ?? 0;
       let canUpgrade: number | false = false;
       let canBuild: TileRef | false = false;
 
@@ -1633,6 +1653,7 @@ export class PlayerImpl implements Player {
         canBuild,
         canUpgrade,
         cost,
+        ...(scienceCost > 0 ? { scienceCost } : {}),
         upgradeCosts,
         overlappingRailroads: buildNew
           ? rail.overlappingRailroads(u, canBuild as TileRef)
@@ -1695,6 +1716,9 @@ export class PlayerImpl implements Player {
       case UnitType.Housing:
       case UnitType.PublicServices:
       case UnitType.ResearchCentre:
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
         return this.landBasedStructureSpawn(targetTile, validTiles);
       default:
         assertNever(unitType);
@@ -2082,12 +2106,15 @@ export class PlayerImpl implements Player {
   }
 
   pathModifiers(): CrownfallPathModifiers {
-    return applyActiveProjectModifiers(
-      applyAugmentModifiers(
-        computeCrownfallPathModifiers(this.pathProgress()),
-        this._selectedAugments,
+    return applyScienceBuildingModifiers(
+      this,
+      applyActiveProjectModifiers(
+        applyAugmentModifiers(
+          computeCrownfallPathModifiers(this.pathProgress()),
+          this._selectedAugments,
+        ),
+        this.activeProject(),
       ),
-      this.activeProject(),
     );
   }
 

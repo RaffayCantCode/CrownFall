@@ -61,18 +61,20 @@ async function createTwoNeighborGame(): Promise<Game> {
 describe("Crownfall Phase 5: Internal Crises, Population Migration & Rebellions", () => {
   test("pure crisis formulas apply band penalties, emigration, migration share, and rebellion meter", () => {
     expect(crisisTroopRegenPercent(70)).toBe(100);
-    expect(crisisTroopRegenPercent(45)).toBe(100);
+    expect(crisisTroopRegenPercent(45)).toBe(
+      CROWNFALL_CRISIS_CONFIG.unrestTroopRegenPercent,
+    );
     expect(crisisTroopRegenPercent(30)).toBe(
       CROWNFALL_CRISIS_CONFIG.crisisTroopRegenPercent,
     );
     expect(crisisTroopRegenPercent(10)).toBe(
-      CROWNFALL_CRISIS_CONFIG.crisisTroopRegenPercent,
+      CROWNFALL_CRISIS_CONFIG.rebellionTroopRegenPercent,
     );
 
     expect(computeEmigrationPerSecond(100_000, 70)).toBe(0);
-    expect(computeEmigrationPerSecond(100_000, 45)).toBe(250);
-    expect(computeEmigrationPerSecond(100_000, 25)).toBe(750);
-    expect(computeEmigrationPerSecond(100_000, 10)).toBe(1200);
+    expect(computeEmigrationPerSecond(100_000, 45)).toBe(350);
+    expect(computeEmigrationPerSecond(100_000, 25)).toBe(900);
+    expect(computeEmigrationPerSecond(100_000, 10)).toBe(1500);
 
     expect(computeNeighborMigrationShare(1000, 2)).toBe(300);
     expect(computeNeighborMigrationShare(1000, 0)).toBe(0);
@@ -81,9 +83,9 @@ describe("Crownfall Phase 5: Internal Crises, Population Migration & Rebellions"
     expect(nextRebellionMeter(20, 10, 25, 0)).toBe(15);
     // Cooldown decays meter
     expect(nextRebellionMeter(20, 10, 80, 100)).toBe(15);
-    // Crisis builds +3/s, Critical builds +8/s
-    expect(nextRebellionMeter(10, 25, 80, 0)).toBe(13);
-    expect(nextRebellionMeter(10, 10, 80, 0)).toBe(18);
+    // Crisis builds +5/s, Critical builds +12/s
+    expect(nextRebellionMeter(10, 25, 80, 0)).toBe(15);
+    expect(nextRebellionMeter(10, 10, 80, 0)).toBe(22);
   });
 
   test("civilians emigrate from unstable empire and migrate to stable bordering neighbor", async () => {

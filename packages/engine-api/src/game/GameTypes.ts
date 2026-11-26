@@ -42,6 +42,18 @@ export enum AugmentId {
   AerospaceCommand = "aerospace_command",
   CivicRenaissance = "civic_renaissance",
   BlitzLogistics = "blitz_logistics",
+  ShockAndAwe = "shock_and_awe",
+  GuerrillaDoctrine = "guerrilla_doctrine",
+  NuclearDeterrence = "nuclear_deterrence",
+  MaritimeTradeEmpire = "maritime_trade_empire",
+  AusterityMeasures = "austerity_measures",
+  KeynesianBoom = "keynesian_boom",
+  IronFistRule = "iron_fist_rule",
+  WelfareState = "welfare_state",
+  ImperialBureaucracy = "imperial_bureaucracy",
+  CyberWarfare = "cyber_warfare",
+  QuantumTargeting = "quantum_targeting",
+  BlackBudgetLabs = "black_budget_labs",
 }
 
 export enum AllianceActionType {
@@ -265,6 +277,9 @@ export enum UnitType {
   Housing = "Housing",
   PublicServices = "Public Services",
   ResearchCentre = "Research Centre",
+  SpyNetwork = "Spy Network",
+  OrbitalRadar = "Orbital Radar",
+  CyberCommand = "Cyber Command",
 }
 
 export enum TrainType {
@@ -297,6 +312,9 @@ export const Structures = unitTypeGroup([
   UnitType.Housing,
   UnitType.PublicServices,
   UnitType.ResearchCentre,
+  UnitType.SpyNetwork,
+  UnitType.OrbitalRadar,
+  UnitType.CyberCommand,
 ] as const);
 
 export const BuildMenus = unitTypeGroup([
@@ -410,6 +428,7 @@ export interface BuildableUnit {
   canUpgrade: number | false;
   type: PlayerBuildableUnitType;
   cost: Gold;
+  scienceCost?: number;
   // Cumulative cost of upgrading 1..MAX_UPGRADE_AMOUNT times (upgrade costs
   // escalate per level, so a bulk total is NOT cost * amount). Only set when
   // canUpgrade is not false.

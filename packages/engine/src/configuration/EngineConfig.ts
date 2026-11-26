@@ -362,7 +362,11 @@ export class EngineConfig extends Config {
     if (cached !== undefined) {
       return cached;
     }
-    const info = { ...super.unitInfo(type), cost: this.unitCost(type) };
+    const info = {
+      ...super.unitInfo(type),
+      cost: this.unitCost(type),
+      scienceCost: this.unitScienceCost(type),
+    };
     this.engineUnitInfoCache.set(type, info);
     return info;
   }
@@ -432,6 +436,9 @@ export class EngineConfig extends Config {
           (numUnits: number) => Math.min(1_250_000, pow2(numUnits) * 150_000),
           UnitType.ResearchCentre,
         );
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
       case UnitType.TransportShip:
       case UnitType.Shell:
       case UnitType.SAMMissile:
@@ -441,6 +448,22 @@ export class EngineConfig extends Config {
         return () => 0n;
       default:
         assertNever(type);
+    }
+  }
+
+  private unitScienceCost(type: UnitType): EngineUnitInfo["scienceCost"] {
+    switch (type) {
+      case UnitType.SpyNetwork:
+        return (_game: Game, player: Player, extraUnits: number = 0) =>
+          300 + (player.unitsOwned(UnitType.SpyNetwork) + extraUnits) * 150;
+      case UnitType.OrbitalRadar:
+        return (_game: Game, player: Player, extraUnits: number = 0) =>
+          500 + (player.unitsOwned(UnitType.OrbitalRadar) + extraUnits) * 250;
+      case UnitType.CyberCommand:
+        return (_game: Game, player: Player, extraUnits: number = 0) =>
+          750 + (player.unitsOwned(UnitType.CyberCommand) + extraUnits) * 350;
+      default:
+        return () => 0;
     }
   }
 

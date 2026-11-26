@@ -276,6 +276,9 @@ export class Config {
         break;
       case UnitType.PublicServices:
       case UnitType.ResearchCentre:
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
         info = {
           constructionDuration: this.instantBuild() ? 0 : 3 * 10,
           upgradable: true,

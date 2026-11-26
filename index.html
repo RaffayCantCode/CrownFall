@@ -470,17 +470,17 @@
     <!-- Bottom HUD: <sm=column, sm..lg=2col (HUD left | events right), lg+=3col grid centered (or left/right rail via data-hud-position) -->
     <div
       id="crownfall-hud-shell"
-      class="[body:not(.in-game)_&]:hidden! fixed bottom-0 left-0 w-full z-[200] flex flex-col pointer-events-none sm:flex-row sm:items-end lg:grid lg:grid-cols-[1fr_minmax(560px,680px)_1fr] lg:items-end min-[1200px]:px-4"
+      class="[body:not(.in-game)_&]:hidden! fixed bottom-0 left-0 w-full z-[200] flex flex-col pointer-events-none sm:flex-row sm:items-end lg:grid lg:grid-cols-[1fr_minmax(420px,540px)_1fr] lg:items-end min-[1200px]:px-3"
       style="
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
       "
     >
-      <!-- HUD: <sm contents (children join outer flex), sm+ flex-col 680px, lg+ col-2 (or fixed left/right rail) -->
+      <!-- HUD: <sm contents (children join outer flex), sm+ flex-col 540px, lg+ col-2 (or fixed left/right rail) -->
       <div
         id="crownfall-hud-dock-col"
-        class="contents sm:flex sm:flex-col sm:pointer-events-none w-full sm:w-[min(96vw,680px)] lg:w-full lg:col-start-2 sm:z-10"
+        class="contents sm:flex sm:flex-col sm:pointer-events-none w-full sm:w-[min(92vw,540px)] lg:w-full lg:col-start-2 sm:z-10"
       >
         <attacks-display
           class="w-full pointer-events-auto order-1 sm:order-none"

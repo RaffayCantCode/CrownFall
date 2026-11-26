@@ -130,6 +130,12 @@ export interface UnitParamsMap {
   [UnitType.PublicServices]: Record<string, never>;
 
   [UnitType.ResearchCentre]: Record<string, never>;
+
+  [UnitType.SpyNetwork]: Record<string, never>;
+
+  [UnitType.OrbitalRadar]: Record<string, never>;
+
+  [UnitType.CyberCommand]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type
@@ -216,6 +222,7 @@ export interface EngineUnitInfo extends UnitInfo {
   // extraUnits shifts the cost curve as if the player already had that many
   // additional units/levels — used to price the later steps of a bulk upgrade.
   cost: (game: Game, player: Player, extraUnits?: number) => Gold;
+  scienceCost?: (game: Game, player: Player, extraUnits?: number) => number;
 }
 
 export interface Unit extends UnitLike {

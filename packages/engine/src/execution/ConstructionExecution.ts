@@ -167,7 +167,10 @@ export class ConstructionExecution implements Execution {
       case UnitType.Housing:
       case UnitType.PublicServices:
       case UnitType.ResearchCentre:
-        // Passive civilian structures: aggregated per-second by PlayerExecution.
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
+        // Passive structures: aggregated by PlayerExecution / pathModifiers.
         break;
       default:
         console.warn(
@@ -188,6 +191,9 @@ export class ConstructionExecution implements Execution {
       case UnitType.Housing:
       case UnitType.PublicServices:
       case UnitType.ResearchCentre:
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
         return true;
       default:
         return false;

@@ -39,6 +39,9 @@ export const otherUnits = [
   "hous",
   "pubs",
   "resc",
+  "spyn",
+  "orbr",
+  "cybc",
 ] as const;
 export const OtherUnitSchema = z.enum(otherUnits);
 export type OtherUnit = z.infer<typeof OtherUnitSchema>;
@@ -52,7 +55,10 @@ export type OtherUnitType =
   | UnitType.Factory
   | UnitType.Housing
   | UnitType.PublicServices
-  | UnitType.ResearchCentre;
+  | UnitType.ResearchCentre
+  | UnitType.SpyNetwork
+  | UnitType.OrbitalRadar
+  | UnitType.CyberCommand;
 
 export const unitTypeToOtherUnit = {
   [UnitType.City]: "city",
@@ -65,6 +71,9 @@ export const unitTypeToOtherUnit = {
   [UnitType.Housing]: "hous",
   [UnitType.PublicServices]: "pubs",
   [UnitType.ResearchCentre]: "resc",
+  [UnitType.SpyNetwork]: "spyn",
+  [UnitType.OrbitalRadar]: "orbr",
+  [UnitType.CyberCommand]: "cybc",
 } as const satisfies Record<OtherUnitType, OtherUnit>;
 
 // Attacks

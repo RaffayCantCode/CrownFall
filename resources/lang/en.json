@@ -1934,6 +1934,9 @@
       "role_housing": "+150K Civilian Capacity",
       "role_public_services": "+6 National Stability",
       "role_research_centre": "+12 Science / sec",
+      "role_spy_network": "Reveals Rival Nation Intel",
+      "role_orbital_radar": "+15% SAM Range, Slows Nukes",
+      "role_cyber_command": "-10% Silo Reload, +15% Sci",
       "role_defense_post": "Fortifies Nearby Borders",
       "role_missile_silo": "Launches Strategic Nukes",
       "role_sam_launcher": "Intercepts Enemy Missiles",
@@ -2186,6 +2189,66 @@
         "name": "Blitz Logistics",
         "pro": "22% faster attack speed and 12% faster troop replenishment.",
         "con": "12% lower tax income and 15% more overexpansion strain."
+      },
+      "shock_and_awe": {
+        "name": "Shock & Awe",
+        "pro": "+25% attack push speed and +30% missile velocity.",
+        "con": "-12 national stability."
+      },
+      "guerrilla_doctrine": {
+        "name": "Guerrilla Doctrine",
+        "pro": "30% slower invaders and 15% fewer combat losses.",
+        "con": "15% lower maximum army capacity."
+      },
+      "nuclear_deterrence": {
+        "name": "Nuclear Deterrence",
+        "pro": "35% faster missile silos and +20% nuke blast radius.",
+        "con": "15% lower civilian tax income."
+      },
+      "maritime_trade_empire": {
+        "name": "Maritime Trade Empire",
+        "pro": "+60% trade income and 15% cheaper structures.",
+        "con": "10% slower troop replenishment."
+      },
+      "austerity_measures": {
+        "name": "Austerity Measures",
+        "pro": "+40% tax income and 10% cheaper structures.",
+        "con": "-12 national stability."
+      },
+      "keynesian_boom": {
+        "name": "Keynesian Boom",
+        "pro": "+35% civilian growth, +30% trade, and +20% tax income.",
+        "con": "10% slower offensive attack speed."
+      },
+      "iron_fist_rule": {
+        "name": "Iron Fist Rule",
+        "pro": "50% less overexpansion strain and +20% army cap.",
+        "con": "15% slower civilian population growth."
+      },
+      "welfare_state": {
+        "name": "Welfare State",
+        "pro": "+22 national stability and +40% civilian growth.",
+        "con": "20% lower civilian tax income."
+      },
+      "imperial_bureaucracy": {
+        "name": "Imperial Bureaucracy",
+        "pro": "40% less overexpansion strain and 20% cheaper structures.",
+        "con": "12% slower offensive attack speed."
+      },
+      "cyber_warfare": {
+        "name": "Cyber Warfare",
+        "pro": "+45% Science, 30% slower enemy nukes, 15% faster silos.",
+        "con": "10% lower civilian tax income."
+      },
+      "quantum_targeting": {
+        "name": "Quantum Targeting",
+        "pro": "+25% nuke blast & speed and 20% fewer combat losses.",
+        "con": "15% slower civilian population growth."
+      },
+      "black_budget_labs": {
+        "name": "Black Budget Labs",
+        "pro": "+70% Science generation.",
+        "con": "-10 national stability and 15% lower tax income."
       }
     },
     "alliance": {
@@ -3548,6 +3611,9 @@
     "housing": "Housing",
     "public_services": "Public Services",
     "research_centre": "Research Centre",
+    "spy_network": "Spy Network",
+    "orbital_radar": "Orbital Radar",
+    "cyber_command": "Cyber Command",
     "hydrogen_bomb": "Hydrogen Bomb",
     "mirv": "MIRV",
     "missile_silo": "Missile Silo",

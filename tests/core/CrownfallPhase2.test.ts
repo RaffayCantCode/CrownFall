@@ -47,7 +47,7 @@ describe("Crownfall Phase 2: National Development Paths", () => {
     expect(player.primaryPath()).toBeNull();
     expect(
       nextTierScienceCost(player.pathProgress(), DevelopmentPath.Military),
-    ).toBe(150);
+    ).toBe(250);
 
     // Choose Military as primary
     game.addExecution(
@@ -63,17 +63,18 @@ describe("Crownfall Phase 2: National Development Paths", () => {
     executeTicks(game, 2);
     expect(player.primaryPath()).toBe(DevelopmentPath.Military);
 
-    // Primary path gets 20% discount (150 -> 120)
+    // Primary path gets 20% discount (250 -> 200)
     expect(
       nextTierScienceCost(player.pathProgress(), DevelopmentPath.Military),
-    ).toBe(120);
-    // Secondary path stays full cost (150)
+    ).toBe(200);
+    // Secondary path stays full cost (250)
     expect(
       nextTierScienceCost(player.pathProgress(), DevelopmentPath.Political),
-    ).toBe(150);
+    ).toBe(250);
 
     // Unlock up to Tier 4 on primary (Military) and Tier 2 on secondary (Political)
-    player.addScience(10_000);
+    player.addScience(15_000);
+    player.addGold(10_000_000n);
     for (let i = 0; i < 5; i++) {
       game.addExecution(
         new UnlockDevTierExecution(player, DevelopmentPath.Military),
@@ -112,16 +113,16 @@ describe("Crownfall Phase 2: National Development Paths", () => {
     expect(player.gold()).toBe(0n);
     expect(player.unlockDevTier(DevelopmentPath.Scientific)).toBe(false);
 
-    // Primary Path gets 20% Gold discount (50,000n -> 40,000n)
+    // Primary Path gets 20% Gold discount (100,000n -> 80,000n)
     player.setPrimaryPath(DevelopmentPath.Scientific);
     expect(
       nextTierGoldCost(player.pathProgress(), DevelopmentPath.Scientific),
-    ).toBe(40_000n);
+    ).toBe(80_000n);
     expect(
       nextTierGoldCost(player.pathProgress(), DevelopmentPath.Political),
-    ).toBe(50_000n);
+    ).toBe(100_000n);
 
-    player.addGold(40_000n);
+    player.addGold(80_000n);
     expect(player.unlockDevTier(DevelopmentPath.Scientific)).toBe(true);
     expect(player.gold()).toBe(0n);
     expect(player.pathModifiers().structureCostPercent).toBeLessThan(100);

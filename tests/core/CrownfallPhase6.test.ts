@@ -59,24 +59,26 @@ describe("Crownfall Phase 6: Advanced Technologies & National Operations", () =>
     }
 
     p1.setPrimaryPath(DevelopmentPath.Military);
-    p1.addScience(5_000);
+    p1.addScience(15_000);
+    p1.addGold(5_000_000n);
     for (let i = 0; i < 4; i++) {
       expect(p1.unlockDevTier(DevelopmentPath.Military)).toBe(true);
     }
 
     p2.setPrimaryPath(DevelopmentPath.Scientific);
-    p2.addScience(5_000);
+    p2.addScience(15_000);
+    p2.addGold(5_000_000n);
     for (let i = 0; i < 4; i++) {
       expect(p2.unlockDevTier(DevelopmentPath.Scientific)).toBe(true);
     }
 
     const milMods = p1.pathModifiers();
-    expect(milMods.siloCooldownPercent).toBe(75); // -25% silo reload
-    expect(milMods.nukeSpeedPercent).toBe(128); // +28% missile speed
+    expect(milMods.siloCooldownPercent).toBe(65); // -35% silo reload
+    expect(milMods.nukeSpeedPercent).toBe(137); // +37% missile speed
 
     const sciMods = p2.pathModifiers();
-    expect(sciMods.nukeBlastRadiusPercent).toBe(122); // +22% precision blast radius
-    expect(sciMods.incomingNukeSlowPercent).toBe(70); // -30% enemy missile speed via EW
+    expect(sciMods.nukeBlastRadiusPercent).toBe(130); // +30% precision blast radius
+    expect(sciMods.incomingNukeSlowPercent).toBe(65); // -35% enemy missile speed via EW
 
     // Verify NukeExecution speed calculation against neutral land vs EW-protected Scientific target
     const baseSpeed = game.config().nukeSpeed(UnitType.AtomBomb);

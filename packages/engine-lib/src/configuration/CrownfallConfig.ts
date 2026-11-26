@@ -44,23 +44,23 @@ export const CROWNFALL_CONFIG = {
   civilianScienceDivisor: 25_000,
 
   /** Stability target contributors. */
-  baseStabilityTarget: 70,
-  publicServicesStabilityPerLevel: 6,
-  publicServicesStabilityMax: 30,
+  baseStabilityTarget: 62,
+  publicServicesStabilityPerLevel: 7,
+  publicServicesStabilityMax: 35,
   housingSurplusBonus: 5,
-  housingOvercrowdedPenalty: -5,
-  activeWarStrainPerAttack: -4,
-  activeWarStrainMax: -16,
-  overexpansionFreeTiles: 10_000,
-  overexpansionTilesPerPoint: 15_000,
-  overexpansionStrainMax: -20,
+  housingOvercrowdedPenalty: -8,
+  activeWarStrainPerAttack: -6,
+  activeWarStrainMax: -24,
+  overexpansionFreeTiles: 6_000,
+  overexpansionTilesPerPoint: 8_000,
+  overexpansionStrainMax: -28,
 
   /** Tax rate modifiers (percentages as integers for deterministic math). */
   tax: {
     [TaxRate.Low]: {
-      incomePercent: 75,
-      stabilityDelta: 10,
-      growthPercent: 115,
+      incomePercent: 60,
+      stabilityDelta: 14,
+      growthPercent: 130,
     },
     [TaxRate.Normal]: {
       incomePercent: 100,
@@ -68,9 +68,9 @@ export const CROWNFALL_CONFIG = {
       growthPercent: 100,
     },
     [TaxRate.High]: {
-      incomePercent: 130,
-      stabilityDelta: -15,
-      growthPercent: 85,
+      incomePercent: 165,
+      stabilityDelta: -26,
+      growthPercent: 70,
     },
   },
 
@@ -248,9 +248,15 @@ export function civilianTaxGoldPerSecond(
   // 15 gold/sec per 1,000 civilians at Normal tax & 100% stability efficiency.
   const baseGold = Math.floor((civilianPop * 15) / 1000);
   const taxMult = CROWNFALL_CONFIG.tax[taxRate].incomePercent;
-  // Low stability hurts tax collection (50% efficiency at 0 stability, 100% at >= 60).
+  // Low stability hurts tax collection sharply (100% at >=60, 75% in unrest, 50% in crisis, 25% in rebellion).
   const stabEfficiency =
-    stability >= 60 ? 100 : 50 + Math.floor((stability * 50) / 60);
+    stability >= 60
+      ? 100
+      : stability >= 35
+        ? 75
+        : stability >= 15
+          ? 50
+          : 25;
   const raw = Math.floor(
     ((baseGold * taxMult * stabEfficiency * mods.civilianTaxPercent) /
       1_000_000) *
@@ -283,4 +289,41 @@ export function sciencePerSecond(
     1,
     Math.floor((raw * stabEfficiency * mods.scienceRatePercent) / 10_000),
   );
+}
+
+/**
+ * Applies passive strategic bonuses from completed Science-only structures
+ * (Orbital Radar and Cyber Command) onto a player's modifiers.
+ */
+export function applyScienceBuildingModifiers(
+  player: PlayerLike,
+  mods: CrownfallPathModifiers,
+): CrownfallPathModifiers {
+  const radarLevels = completedStructureLevels(player, UnitType.OrbitalRadar);
+  const cyberLevels = completedStructureLevels(player, UnitType.CyberCommand);
+  if (radarLevels === 0 && cyberLevels === 0) {
+    return mods;
+  }
+  const samRangeBonus = Math.min(60, radarLevels * 15);
+  const incomingNukeSlow = Math.min(35, radarLevels * 10);
+  const siloCooldownCut = Math.min(35, cyberLevels * 10);
+  const scienceBonus = Math.min(60, cyberLevels * 15);
+  const attackerLossCut = Math.min(20, cyberLevels * 5);
+  return {
+    ...mods,
+    samRangePercent: mods.samRangePercent + samRangeBonus,
+    incomingNukeSlowPercent: Math.max(
+      35,
+      mods.incomingNukeSlowPercent - incomingNukeSlow,
+    ),
+    siloCooldownPercent: Math.max(
+      35,
+      mods.siloCooldownPercent - siloCooldownCut,
+    ),
+    scienceRatePercent: mods.scienceRatePercent + scienceBonus,
+    attackerLossPercent: Math.max(
+      40,
+      mods.attackerLossPercent - attackerLossCut,
+    ),
+  };
 }
