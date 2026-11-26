@@ -205,7 +205,7 @@
       "city": "Increases max population",
       "defense_post": "Increases defenses of nearby borders",
       "factory": "Creates railroads and spawns trains",
-      "housing": "Increases civilian population capacity and welfare",
+      "housing": "Generates +2.5K Gold/s, +10% troop regen, -5% build cost & +8% Science",
       "public_services": "Improves national stability across your empire",
       "research_centre": "Generates Science for national development",
       "hydrogen_bomb": "Large explosion",
@@ -1931,8 +1931,8 @@
       "role_city": "+250K Max Army Cap",
       "role_factory": "Railroads & Train Gold",
       "role_port": "Naval Access & Trade Ships",
-      "role_housing": "+150K Civilian Capacity",
-      "role_public_services": "+6 National Stability",
+      "role_housing": "+2.5K Gold/s, +10% Regen & Power",
+      "role_public_services": "+7 National Stability",
       "role_research_centre": "+12 Science / sec",
       "role_spy_network": "Reveals Rival Nation Intel",
       "role_orbital_radar": "+15% SAM Range, Slows Nukes",
@@ -2094,6 +2094,78 @@
         "pro": "+75% SAM range, -65% SAM reload, -45% enemy nuke speed, +30% blast, -35% Silo CD",
         "con": "-8 immediate stability from orbital power draw",
         "activated": "Orbital Aegis & Quantum Strike engaged! Total aerospace supremacy established."
+      },
+      "paratrooper_drop": {
+        "name": "Airborne Drop",
+        "pro": "+12% instant reserves, +30% attack speed, -10% losses",
+        "con": "-6 immediate stability",
+        "activated": "Airborne divisions deployed behind enemy lines!"
+      },
+      "bunker_network": {
+        "name": "Bunker Line",
+        "pro": "-40% invader speed, +25% SAM range, -20% build cost",
+        "con": "-15% offensive attack speed",
+        "activated": "Fortified bunker line online along all borders!"
+      },
+      "scorched_earth": {
+        "name": "Scorched Earth",
+        "pro": "+10% reserves, -50% invader speed, -25% combat losses",
+        "con": "-10 stability & -25% civilian tax",
+        "activated": "Scorched Earth protocol enacted!"
+      },
+      "thermonuclear_readiness": {
+        "name": "DEFCON 1 Triad",
+        "pro": "-60% Silo reload, +35% nuke blast & missile speed",
+        "con": "-15 immediate stability",
+        "activated": "DEFCON 1 Nuclear Triad armed and ready!"
+      },
+      "trade_fleet_charter": {
+        "name": "Merchant Armada",
+        "pro": "Instant +80K Gold, +60% trade income, -20% build cost",
+        "con": "-10% troop replenishment",
+        "activated": "Sovereign Merchant Armada chartered!"
+      },
+      "martial_law": {
+        "name": "Martial Law",
+        "pro": "-50% rebellion risk, +10 stability, +15% cap & +20% regen",
+        "con": "-25% civilian growth",
+        "activated": "Martial Law declared — unrest suppressed!"
+      },
+      "diplomatic_subsidy": {
+        "name": "Foreign Aid Summit",
+        "pro": "Instant +250K Gold & +25K Civilians, +45% tax income",
+        "con": "-15% offensive attack speed",
+        "activated": "Foreign Aid Summit secured +250K Gold!"
+      },
+      "continental_hegemony": {
+        "name": "Imperial Decree",
+        "pro": "+15% reserves, -80% expansion strain, +30% army cap",
+        "con": "-15% Science rate",
+        "activated": "Imperial Decree issued across the continent!"
+      },
+      "crash_research_program": {
+        "name": "Manhattan Sprint",
+        "pro": "Instant +220 SCI and +80% Science rate",
+        "con": "-4 stability & -20% tax income",
+        "activated": "Crash Research Program accelerated breakthrough output!"
+      },
+      "cyber_blackout": {
+        "name": "Grid Blackout",
+        "pro": "-40% enemy nuke speed, -35% invader speed, -20% Silo CD",
+        "con": "-6 immediate stability",
+        "activated": "Enemy command grids jammed via Cyber Blackout!"
+      },
+      "nanite_construction": {
+        "name": "Nanite Swarm",
+        "pro": "-45% build cost, +35% troop regen & civilian growth",
+        "con": "-8 immediate stability",
+        "activated": "Nanite Construction Swarms deployed!"
+      },
+      "project_singularity": {
+        "name": "AI Singularity",
+        "pro": "Instant +500 SCI, +100% Science, -40% losses, +25% speed",
+        "con": "-12 immediate stability",
+        "activated": "Project Singularity achieved!"
       }
     },
     "path_draft_badge": "Opening Mandate • Choose Your Destiny",
@@ -3608,7 +3680,7 @@
     "city": "City",
     "defense_post": "Defense Post",
     "factory": "Factory",
-    "housing": "Housing",
+    "housing": "Power Plant",
     "public_services": "Public Services",
     "research_centre": "Research Centre",
     "spy_network": "Spy Network",

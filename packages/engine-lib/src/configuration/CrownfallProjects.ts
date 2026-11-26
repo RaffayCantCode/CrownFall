@@ -3,6 +3,7 @@ import {
   Gold,
   NationalProject,
 } from "@openfront/engine-api/game/GameTypes";
+import { PseudoRandom } from "../PseudoRandom";
 import {
   type CrownfallPathModifiers,
   pathLevelFor,
@@ -330,6 +331,295 @@ export const ALL_NATIONAL_PROJECTS: readonly NationalProjectDefinition[] = [
       siloCooldownPercent: -35,
     },
   },
+  // ================= EXPANDED RANDOMIZED OPERATIONS POOL =================
+  {
+    id: NationalProject.ParatrooperDrop,
+    requiredPath: DevelopmentPath.Military,
+    requiredTier: 1,
+    scienceCost: 70,
+    goldCost: 45_000n,
+    durationTicks: 160,
+    cooldownTicks: 450,
+    immediateStabilityDelta: -6,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 12,
+    mobilisationMaxTroops: 95_000,
+    nameKey: "crownfall.project.paratrooper_drop.name",
+    proKey: "crownfall.project.paratrooper_drop.pro",
+    conKey: "crownfall.project.paratrooper_drop.con",
+    modifiers: {
+      attackSpeedPercent: 30,
+      attackerLossPercent: -10,
+    },
+  },
+  {
+    id: NationalProject.BunkerNetwork,
+    requiredPath: DevelopmentPath.Military,
+    requiredTier: 2,
+    scienceCost: 130,
+    goldCost: 70_000n,
+    durationTicks: 220,
+    cooldownTicks: 550,
+    immediateStabilityDelta: 0,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.bunker_network.name",
+    proKey: "crownfall.project.bunker_network.pro",
+    conKey: "crownfall.project.bunker_network.con",
+    modifiers: {
+      defenderSlowPercent: -40,
+      samRangePercent: 25,
+      structureCostPercent: -20,
+      attackSpeedPercent: -15,
+    },
+  },
+  {
+    id: NationalProject.ScorchedEarth,
+    requiredPath: DevelopmentPath.Military,
+    requiredTier: 3,
+    scienceCost: 220,
+    goldCost: 130_000n,
+    durationTicks: 240,
+    cooldownTicks: 650,
+    immediateStabilityDelta: -10,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 10,
+    mobilisationMaxTroops: 140_000,
+    nameKey: "crownfall.project.scorched_earth.name",
+    proKey: "crownfall.project.scorched_earth.pro",
+    conKey: "crownfall.project.scorched_earth.con",
+    modifiers: {
+      defenderSlowPercent: -50,
+      attackerLossPercent: -25,
+      civilianTaxPercent: -25,
+    },
+  },
+  {
+    id: NationalProject.ThermonuclearReadiness,
+    requiredPath: DevelopmentPath.Military,
+    requiredTier: 4,
+    scienceCost: 350,
+    goldCost: 250_000n,
+    durationTicks: 260,
+    cooldownTicks: 750,
+    immediateStabilityDelta: -15,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.thermonuclear_readiness.name",
+    proKey: "crownfall.project.thermonuclear_readiness.pro",
+    conKey: "crownfall.project.thermonuclear_readiness.con",
+    modifiers: {
+      siloCooldownPercent: -60,
+      nukeBlastRadiusPercent: 35,
+      nukeSpeedPercent: 35,
+      samRangePercent: 30,
+    },
+  },
+  {
+    id: NationalProject.TradeFleetCharter,
+    requiredPath: DevelopmentPath.Political,
+    requiredTier: 1,
+    scienceCost: 65,
+    goldCost: 30_000n,
+    durationTicks: 200,
+    cooldownTicks: 450,
+    immediateStabilityDelta: 4,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 80_000n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.trade_fleet_charter.name",
+    proKey: "crownfall.project.trade_fleet_charter.pro",
+    conKey: "crownfall.project.trade_fleet_charter.con",
+    modifiers: {
+      tradeIncomePercent: 60,
+      structureCostPercent: -20,
+      troopRegenPercent: -10,
+    },
+  },
+  {
+    id: NationalProject.MartialLaw,
+    requiredPath: DevelopmentPath.Political,
+    requiredTier: 2,
+    scienceCost: 110,
+    goldCost: 50_000n,
+    durationTicks: 200,
+    cooldownTicks: 550,
+    immediateStabilityDelta: 10,
+    immediateRebellionDelta: -50,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 8,
+    mobilisationMaxTroops: 90_000,
+    nameKey: "crownfall.project.martial_law.name",
+    proKey: "crownfall.project.martial_law.pro",
+    conKey: "crownfall.project.martial_law.con",
+    modifiers: {
+      maxTroopsPercent: 15,
+      troopRegenPercent: 20,
+      civilianGrowthPercent: -25,
+    },
+  },
+  {
+    id: NationalProject.DiplomaticSubsidy,
+    requiredPath: DevelopmentPath.Political,
+    requiredTier: 3,
+    scienceCost: 190,
+    goldCost: 0n,
+    durationTicks: 220,
+    cooldownTicks: 650,
+    immediateStabilityDelta: 12,
+    immediateRebellionDelta: -25,
+    immediateGoldGrant: 250_000n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 25_000,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.diplomatic_subsidy.name",
+    proKey: "crownfall.project.diplomatic_subsidy.pro",
+    conKey: "crownfall.project.diplomatic_subsidy.con",
+    modifiers: {
+      civilianTaxPercent: 45,
+      attackSpeedPercent: -15,
+    },
+  },
+  {
+    id: NationalProject.ContinentalHegemony,
+    requiredPath: DevelopmentPath.Political,
+    requiredTier: 4,
+    scienceCost: 310,
+    goldCost: 180_000n,
+    durationTicks: 280,
+    cooldownTicks: 750,
+    immediateStabilityDelta: 15,
+    immediateRebellionDelta: -50,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 30_000,
+    mobilisationCapPercent: 15,
+    mobilisationMaxTroops: 180_000,
+    nameKey: "crownfall.project.continental_hegemony.name",
+    proKey: "crownfall.project.continental_hegemony.pro",
+    conKey: "crownfall.project.continental_hegemony.con",
+    modifiers: {
+      overexpansionStrainPercent: -80,
+      maxTroopsPercent: 30,
+      defenderSlowPercent: -30,
+      scienceRatePercent: -15,
+    },
+  },
+  {
+    id: NationalProject.CrashResearchProgram,
+    requiredPath: DevelopmentPath.Scientific,
+    requiredTier: 1,
+    scienceCost: 0,
+    goldCost: 90_000n,
+    durationTicks: 180,
+    cooldownTicks: 450,
+    immediateStabilityDelta: -4,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 220,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.crash_research_program.name",
+    proKey: "crownfall.project.crash_research_program.pro",
+    conKey: "crownfall.project.crash_research_program.con",
+    modifiers: {
+      scienceRatePercent: 80,
+      civilianTaxPercent: -20,
+    },
+  },
+  {
+    id: NationalProject.CyberBlackout,
+    requiredPath: DevelopmentPath.Scientific,
+    requiredTier: 2,
+    scienceCost: 140,
+    goldCost: 75_000n,
+    durationTicks: 200,
+    cooldownTicks: 580,
+    immediateStabilityDelta: -6,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.cyber_blackout.name",
+    proKey: "crownfall.project.cyber_blackout.pro",
+    conKey: "crownfall.project.cyber_blackout.con",
+    modifiers: {
+      incomingNukeSlowPercent: -40,
+      defenderSlowPercent: -35,
+      siloCooldownPercent: -20,
+    },
+  },
+  {
+    id: NationalProject.NaniteConstruction,
+    requiredPath: DevelopmentPath.Scientific,
+    requiredTier: 3,
+    scienceCost: 220,
+    goldCost: 100_000n,
+    durationTicks: 230,
+    cooldownTicks: 620,
+    immediateStabilityDelta: -8,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 0,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 0,
+    mobilisationMaxTroops: 0,
+    nameKey: "crownfall.project.nanite_construction.name",
+    proKey: "crownfall.project.nanite_construction.pro",
+    conKey: "crownfall.project.nanite_construction.con",
+    modifiers: {
+      structureCostPercent: -45,
+      civilianGrowthPercent: 35,
+      troopRegenPercent: 35,
+    },
+  },
+  {
+    id: NationalProject.ProjectSingularity,
+    requiredPath: DevelopmentPath.Scientific,
+    requiredTier: 4,
+    scienceCost: 340,
+    goldCost: 240_000n,
+    durationTicks: 260,
+    cooldownTicks: 750,
+    immediateStabilityDelta: -12,
+    immediateRebellionDelta: 0,
+    immediateGoldGrant: 0n,
+    immediateScienceGrant: 500,
+    immediateCivilianGrant: 0,
+    mobilisationCapPercent: 12,
+    mobilisationMaxTroops: 160_000,
+    nameKey: "crownfall.project.project_singularity.name",
+    proKey: "crownfall.project.project_singularity.pro",
+    conKey: "crownfall.project.project_singularity.con",
+    modifiers: {
+      scienceRatePercent: 100,
+      attackerLossPercent: -40,
+      attackSpeedPercent: 25,
+    },
+  },
 ];
 
 export const NATIONAL_PROJECTS_BY_ID: Record<
@@ -351,6 +641,94 @@ export function projectsForPath(
   path: DevelopmentPath,
 ): readonly NationalProjectDefinition[] {
   return ALL_NATIONAL_PROJECTS.filter((def) => def.requiredPath === path);
+}
+
+function hashSeedString(str: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) || 1;
+}
+
+function pickRandomSubset(
+  rng: PseudoRandom,
+  pool: readonly NationalProjectDefinition[],
+  count: number,
+): NationalProjectDefinition[] {
+  const arr = pool.slice();
+  const out: NationalProjectDefinition[] = [];
+  while (out.length < count && arr.length > 0) {
+    const idx = rng.nextInt(0, arr.length);
+    out.push(arr[idx]);
+    arr.splice(idx, 1);
+  }
+  return out;
+}
+
+/**
+ * Deterministically rolls a fresh, randomized roster of National Operations
+ * for a given match & player (`seedKey = "${gameID}:${playerID}"`).
+ *
+ * - Before choosing a Primary Path: rolls 6 random operations (2 per path,
+ *   prioritizing T1–T2 so players can inspect early options).
+ * - After choosing a Primary Path: rolls 5 random operations from the Primary
+ *   Path (1 per tier T1–T4 + 1 wildcard) plus 3 random T1–T2 secondary-path
+ *   operations = 8 unique operations every match!
+ */
+export function rollMatchOperations(
+  seedKey: string,
+  primaryPath: DevelopmentPath | null,
+): readonly NationalProjectDefinition[] {
+  const rng = new PseudoRandom(hashSeedString(seedKey));
+
+  if (primaryPath === null) {
+    const out: NationalProjectDefinition[] = [];
+    for (const path of [
+      DevelopmentPath.Military,
+      DevelopmentPath.Political,
+      DevelopmentPath.Scientific,
+    ]) {
+      const earlyPool = ALL_NATIONAL_PROJECTS.filter(
+        (p) => p.requiredPath === path && p.requiredTier <= 2,
+      );
+      out.push(...pickRandomSubset(rng, earlyPool, 2));
+    }
+    return out;
+  }
+
+  const chosen: NationalProjectDefinition[] = [];
+  const used = new Set<NationalProject>();
+  // Pick 1 random op for each tier T1..T4 of primaryPath so progression is always smooth
+  for (const tier of [1, 2, 3, 4]) {
+    const tierPool = ALL_NATIONAL_PROJECTS.filter(
+      (p) => p.requiredPath === primaryPath && p.requiredTier === tier,
+    );
+    const picked = pickRandomSubset(rng, tierPool, 1);
+    for (const p of picked) {
+      chosen.push(p);
+      used.add(p.id);
+    }
+  }
+  // Plus 2 random wildcard primary ops
+  const remainingPrimary = ALL_NATIONAL_PROJECTS.filter(
+    (p) => p.requiredPath === primaryPath && !used.has(p.id),
+  );
+  for (const p of pickRandomSubset(rng, remainingPrimary, 2)) {
+    chosen.push(p);
+    used.add(p.id);
+  }
+  // Plus 2 random cross-path T1–T2 ops (secondary paths cap at T2)
+  const crossPool = ALL_NATIONAL_PROJECTS.filter(
+    (p) =>
+      p.requiredPath !== primaryPath &&
+      p.requiredTier <= 2 &&
+      !used.has(p.id),
+  );
+  chosen.push(...pickRandomSubset(rng, crossPool, 2));
+
+  return chosen.sort((a, b) => a.requiredTier - b.requiredTier);
 }
 
 export function applyActiveProjectModifiers(

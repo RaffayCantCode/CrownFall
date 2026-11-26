@@ -43,7 +43,9 @@ import {
 } from "@openfront/engine-lib/configuration/CrownfallAugments";
 import {
   applyScienceBuildingModifiers,
+  completedStructureLevels,
   CROWNFALL_CONFIG,
+  requiredResearchLevels,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import {
   computeCrownfallPathModifiers,
@@ -1540,6 +1542,13 @@ export class PlayerImpl implements Player {
     }
     const sciCost = info.scienceCost?.(this.mg, this) ?? 0;
     if (sciCost > 0 && this._science < sciCost) {
+      return false;
+    }
+    const reqResearch = requiredResearchLevels(unitType);
+    if (
+      reqResearch > 0 &&
+      completedStructureLevels(this, UnitType.ResearchCentre) < reqResearch
+    ) {
       return false;
     }
     if (unitType !== UnitType.MIRVWarhead && !this.isAlive()) {

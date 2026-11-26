@@ -37,7 +37,7 @@ const atomBombIcon = assetUrl("images/NukeIconWhite.svg");
 const portIcon = assetUrl("images/PortIcon.svg");
 const samlauncherIcon = assetUrl("images/SamLauncherIconWhite.svg");
 const shieldIcon = assetUrl("images/ShieldIconWhite.svg");
-const housingIcon = assetUrl("images/HousingIconWhite.svg");
+const housingIcon = assetUrl("images/PowerPlantIconWhite.svg");
 const publicServicesIcon = assetUrl("images/PublicServicesIconWhite.svg");
 const researchCentreIcon = assetUrl("images/ResearchCentreIconWhite.svg");
 

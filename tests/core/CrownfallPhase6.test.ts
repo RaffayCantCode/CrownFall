@@ -11,6 +11,7 @@ import {
   ALL_NATIONAL_PROJECTS,
   NATIONAL_PROJECTS_BY_ID,
   projectsForPath,
+  rollMatchOperations,
 } from "@openfront/engine-lib/configuration/CrownfallProjects";
 import { ActivateNationalProjectExecution } from "@openfront/engine/execution/ActivateNationalProjectExecution";
 import { NukeExecution } from "@openfront/engine/execution/NukeExecution";
@@ -225,11 +226,20 @@ describe("Crownfall Phase 6: Advanced Technologies & National Operations", () =>
     expect(rp1.projectCooldownUntilTick()).toBe(p1.projectCooldownUntilTick());
   });
 
-  test("12 unique Path-tied Operations (4 per Path across T1–T4) unlock progressively and grant distinct effects", async () => {
-    expect(ALL_NATIONAL_PROJECTS.length).toBe(12);
-    expect(projectsForPath(DevelopmentPath.Military).length).toBe(4);
-    expect(projectsForPath(DevelopmentPath.Political).length).toBe(4);
-    expect(projectsForPath(DevelopmentPath.Scientific).length).toBe(4);
+  test("24 unique Path-tied Operations (8 per Path) unlock progressively and roll randomized match rosters", async () => {
+    expect(ALL_NATIONAL_PROJECTS.length).toBe(24);
+    expect(projectsForPath(DevelopmentPath.Military).length).toBe(8);
+    expect(projectsForPath(DevelopmentPath.Political).length).toBe(8);
+    expect(projectsForPath(DevelopmentPath.Scientific).length).toBe(8);
+
+    const rollA = rollMatchOperations("game-alpha:p1", DevelopmentPath.Military);
+    const rollB = rollMatchOperations("game-bravo:p1", DevelopmentPath.Military);
+    expect(rollA.length).toBe(8);
+    expect(rollB.length).toBe(8);
+    // Deterministic for same match seed
+    expect(rollMatchOperations("game-alpha:p1", DevelopmentPath.Military)).toEqual(
+      rollA,
+    );
 
     const game = await createPhase6Game();
     const p1 = game.player("p1");

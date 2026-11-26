@@ -68,19 +68,31 @@ export enum AllianceActionType {
 export enum NationalProject {
   // Military Path Operations (T1–T4)
   FrontlineConscription = "frontline_conscription",
+  ParatrooperDrop = "paratrooper_drop",
   SurgeMobilisation = "surge_mobilisation",
+  BunkerNetwork = "bunker_network",
   ArmoredSpearhead = "armored_spearhead",
+  ScorchedEarth = "scorched_earth",
   DefconBarrage = "defcon_barrage",
+  ThermonuclearReadiness = "thermonuclear_readiness",
   // Political Path Operations (T1–T4)
   WarBonds = "war_bonds",
+  TradeFleetCharter = "trade_fleet_charter",
   NationalReconciliation = "national_reconciliation",
+  MartialLaw = "martial_law",
   SovereignBastion = "sovereign_bastion",
+  DiplomaticSubsidy = "diplomatic_subsidy",
   ImperialGoldenAge = "imperial_golden_age",
+  ContinentalHegemony = "continental_hegemony",
   // Scientific Path Operations (T1–T4)
   ResearchGrant = "research_grant",
+  CrashResearchProgram = "crash_research_program",
   EmpOverdrive = "emp_overdrive",
+  CyberBlackout = "cyber_blackout",
   DroneFoundry = "drone_foundry",
+  NaniteConstruction = "nanite_construction",
   OrbitalAegis = "orbital_aegis",
+  ProjectSingularity = "project_singularity",
 }
 
 export type WarshipState = {

@@ -44,12 +44,12 @@ import structureVertSrc from "../shaders/structure/structure.vert.glsl?raw";
 
 const iconAtlasUrl = assetUrl("atlases/icon-atlas.png");
 const EXTRA_STRUCTURE_ICON_URLS = [
-  assetUrl("images/HousingIconWhite.svg"),
+  assetUrl("images/PowerPlantIconWhite.svg"),
   assetUrl("images/PublicServicesIconWhite.svg"),
   assetUrl("images/ResearchCentreIconWhite.svg"),
-  assetUrl("images/crownfall/ops-emp.svg"),
-  assetUrl("images/SamLauncherIconWhite.svg"),
-  assetUrl("images/crownfall/path-scientific.svg"),
+  assetUrl("images/SpyNetworkIconWhite.svg"),
+  assetUrl("images/OrbitalRadarIconWhite.svg"),
+  assetUrl("images/CyberCommandIconWhite.svg"),
 ] as const;
 
 // ---------------------------------------------------------------------------

@@ -91,13 +91,19 @@ describe("Crownfall Phase 1: National Management, Stability & Civilian Buildings
     const tile2 = game.ref(35, 10);
     const tile3 = game.ref(10, 35);
 
-    // Build Housing
+    // Build Power Plant (UnitType.Housing) and verify cap + modifier boosts
     game.addExecution(new ConstructionExecution(player, UnitType.Housing, tile1));
     executeTicks(game, 5);
     expect(player.units(UnitType.Housing).length).toBe(1);
     expect(maxCivilianPopulation(player)).toBe(
       baseCap + CROWNFALL_CONFIG.housingPopCapPerLevel,
     );
+    expect(player.pathModifiers().troopRegenPercent).toBeGreaterThan(100);
+
+    // Orbital Radar & Cyber Command require 5 and 10 Research Centre levels
+    player.addScience(5_000);
+    expect(player.canBuild(UnitType.OrbitalRadar, game.ref(25, 25))).toBe(false);
+    expect(player.canBuild(UnitType.CyberCommand, game.ref(25, 25))).toBe(false);
 
     // Build Research Centre and verify science generation
     const sciBefore = player.science();

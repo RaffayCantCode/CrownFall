@@ -40,6 +40,8 @@ export const CROWNFALL_CONFIG = {
   baseSciencePerSec: 2,
   /** Base science generated per second per Research Centre level. */
   researchCentreSciencePerSec: 12,
+  /** Passive industrial gold per second per Power Plant (UnitType.Housing) level. */
+  powerPlantGoldPerSec: 2_500,
   /** Passive science per second from every 25k civilian population. */
   civilianScienceDivisor: 25_000,
 
@@ -262,7 +264,11 @@ export function civilianTaxGoldPerSecond(
       1_000_000) *
       goldMultiplier,
   );
-  return BigInt(Math.max(0, raw));
+  const powerLevels = completedStructureLevels(player, UnitType.Housing);
+  const powerGold = Math.floor(
+    powerLevels * CROWNFALL_CONFIG.powerPlantGoldPerSec * goldMultiplier,
+  );
+  return BigInt(Math.max(0, raw + powerGold));
 }
 
 export function sciencePerSecond(
@@ -292,25 +298,51 @@ export function sciencePerSecond(
 }
 
 /**
- * Applies passive strategic bonuses from completed Science-only structures
- * (Orbital Radar and Cyber Command) onto a player's modifiers.
+ * Minimum completed Research Centre levels required to construct advanced
+ * Science-dependent structures and strategic systems.
+ */
+export function requiredResearchLevels(unitType: UnitType): number {
+  switch (unitType) {
+    case UnitType.SpyNetwork:
+      return 3;
+    case UnitType.OrbitalRadar:
+      return 5;
+    case UnitType.CyberCommand:
+      return 10;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Applies passive strategic bonuses from completed Power Plants (UnitType.Housing),
+ * Orbital Radars, and Cyber Commands onto a player's modifiers.
  */
 export function applyScienceBuildingModifiers(
   player: PlayerLike,
   mods: CrownfallPathModifiers,
 ): CrownfallPathModifiers {
+  const powerLevels = completedStructureLevels(player, UnitType.Housing);
   const radarLevels = completedStructureLevels(player, UnitType.OrbitalRadar);
   const cyberLevels = completedStructureLevels(player, UnitType.CyberCommand);
-  if (radarLevels === 0 && cyberLevels === 0) {
+  if (powerLevels === 0 && radarLevels === 0 && cyberLevels === 0) {
     return mods;
   }
+  const powerRegenBonus = Math.min(50, powerLevels * 10);
+  const powerCostCut = Math.min(25, powerLevels * 5);
+  const powerSciBonus = Math.min(40, powerLevels * 8);
   const samRangeBonus = Math.min(60, radarLevels * 15);
   const incomingNukeSlow = Math.min(35, radarLevels * 10);
   const siloCooldownCut = Math.min(35, cyberLevels * 10);
-  const scienceBonus = Math.min(60, cyberLevels * 15);
+  const scienceBonus = Math.min(60, cyberLevels * 15) + powerSciBonus;
   const attackerLossCut = Math.min(20, cyberLevels * 5);
   return {
     ...mods,
+    troopRegenPercent: mods.troopRegenPercent + powerRegenBonus,
+    structureCostPercent: Math.max(
+      45,
+      mods.structureCostPercent - powerCostCut,
+    ),
     samRangePercent: mods.samRangePercent + samRangeBonus,
     incomingNukeSlowPercent: Math.max(
       35,
