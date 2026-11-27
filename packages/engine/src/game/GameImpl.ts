@@ -24,12 +24,15 @@ import {
   TerrainType,
   TerraNullius,
   Tick,
+  TradeAgreementType,
   Trios,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
   GameUpdate,
   GameUpdateType,
+  PendingTradeRequestView,
+  TradeAgreementView,
 } from "@openfront/engine-api/game/GameUpdates";
 import {
   ReadonlyTileSet,
@@ -43,6 +46,15 @@ import {
 } from "@openfront/engine-api/Schemas";
 import { ATTACK_INDEX_SENT } from "@openfront/engine-api/StatsSchemas";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
+import {
+  CROWNFALL_BOUNTY_CONFIG,
+  isEligibleBountyTargetType,
+  rollScaledBountyReward,
+} from "@openfront/engine-lib/configuration/CrownfallBounties";
+import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
+import { maxFoodStorage } from "@openfront/engine-lib/configuration/CrownfallFood";
+import { CROWNFALL_TRADE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallTrade";
+import { completedStructureLevels } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import {
   AUGMENT_ROUND_TICKS,
   MAX_AUGMENTS_PER_PLAYER,
@@ -203,6 +215,18 @@ export class GameImpl implements Game {
     expiresAt: Tick;
   }[] = [];
   private _allianceActionCooldowns = new Map<string, Tick>();
+  private _nextTradeID: number = 1;
+  private _pendingTradeRequests: PendingTradeRequestView[] = [];
+  private _activeTradeAgreements: TradeAgreementView[] = [];
+  private _tradeCooldowns = new Map<string, Tick>();
+  private _activeBountyTargetID: PlayerID | null = null;
+  private _bountyExpiresTick: Tick = 0;
+  private _nextBountyEligibleTick: Tick =
+    CROWNFALL_BOUNTY_CONFIG.firstBountyDelayTicks;
+  private _lastBountyTargetID: PlayerID | null = null;
+  private _bountiesTriggered: number = 0;
+  private _bountyTilesConquered = new Map<PlayerID, number>();
+  private _bountyClaimsByPlayer = new Map<PlayerID, number>();
   private _winner: Player | Team | null = null;
   private _waterManager: WaterManager;
   private _sharedWaterCache: SharedWaterCache;
@@ -893,6 +917,578 @@ export class GameImpl implements Game {
     return true;
   }
 
+  private tradePairKey(a: PlayerID, b: PlayerID): string {
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+  }
+
+  private arePlayersAtWarOrHostile(a: Player, b: Player): boolean {
+    if (!a.isAlive() || !b.isAlive()) return true;
+    if (a.hasEmbargoAgainst(b) || b.hasEmbargoAgainst(a)) return true;
+    for (const atk of a.outgoingAttacks()) {
+      if (atk.target() === b) return true;
+    }
+    for (const atk of b.outgoingAttacks()) {
+      if (atk.target() === a) return true;
+    }
+    return false;
+  }
+
+  private canPlayersTrade(a: Player, b: Player): boolean {
+    if (this._config.disableTrade()) return false;
+    if (a === b || a.type() === PlayerType.Bot || b.type() === PlayerType.Bot) {
+      return false;
+    }
+    if (this.arePlayersAtWarOrHostile(a, b)) return false;
+    return a.isFriendly(b) || a.sharesBorderWith(b);
+  }
+
+  tradeAgreementsFor(player: Player): readonly TradeAgreementView[] {
+    if (this._activeTradeAgreements.length === 0) return [];
+    const pid = player.id();
+    return this._activeTradeAgreements.filter(
+      (t) => t.proposerID === pid || t.partnerID === pid,
+    );
+  }
+
+  pendingTradeRequestsFor(recipient: Player): readonly PendingTradeRequestView[] {
+    if (this._pendingTradeRequests.length === 0) return [];
+    const pid = recipient.id();
+    return this._pendingTradeRequests.filter(
+      (r) => r.recipientID === pid && r.expiresAt > this._ticks,
+    );
+  }
+
+  createTradeRequest(
+    proposer: Player,
+    recipient: Player,
+    tradeType: TradeAgreementType,
+  ): number | null {
+    if (!this.canPlayersTrade(proposer, recipient)) return null;
+    if (
+      (tradeType === TradeAgreementType.ImportFood ||
+        tradeType === TradeAgreementType.ExportFood) &&
+      this._config.disableFood()
+    ) {
+      return null;
+    }
+    if (
+      this.tradeAgreementsFor(proposer).length >=
+        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer ||
+      this.tradeAgreementsFor(recipient).length >=
+        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer
+    ) {
+      return null;
+    }
+
+    const pairKey = this.tradePairKey(proposer.id(), recipient.id());
+    const lastCooldown = this._tradeCooldowns.get(pairKey);
+    if (
+      lastCooldown !== undefined &&
+      this._ticks - lastCooldown < CROWNFALL_TRADE_CONFIG.cooldownTicks
+    ) {
+      return null;
+    }
+
+    const alreadyPaired = this._activeTradeAgreements.some(
+      (t) =>
+        this.tradePairKey(t.proposerID, t.partnerID) === pairKey,
+    );
+    if (alreadyPaired) return null;
+
+    const alreadyPending = this._pendingTradeRequests.some(
+      (r) =>
+        this.tradePairKey(r.proposerID, r.recipientID) === pairKey &&
+        r.expiresAt > this._ticks,
+    );
+    if (alreadyPending) return null;
+
+    const id = this._nextTradeID++;
+    this._pendingTradeRequests.push({
+      id,
+      proposerID: proposer.id(),
+      recipientID: recipient.id(),
+      tradeType,
+      createdAt: this._ticks,
+      expiresAt: this._ticks + CROWNFALL_TRADE_CONFIG.requestDurationTicks,
+    });
+    return id;
+  }
+
+  replyTradeRequest(
+    recipient: Player,
+    requestID: number,
+    accept: boolean,
+  ): boolean {
+    const idx = this._pendingTradeRequests.findIndex((r) => r.id === requestID);
+    if (idx === -1) return false;
+    const req = this._pendingTradeRequests[idx];
+    if (req.recipientID !== recipient.id()) return false;
+    this._pendingTradeRequests.splice(idx, 1);
+
+    if (req.expiresAt <= this._ticks || !this.hasPlayer(req.proposerID)) {
+      return false;
+    }
+    const proposer = this.player(req.proposerID);
+    const pairKey = this.tradePairKey(proposer.id(), recipient.id());
+
+    if (!accept) {
+      this._tradeCooldowns.set(pairKey, this._ticks);
+      this.displayMessage(
+        "crownfall.trade_declined",
+        MessageType.ALLIANCE_REJECTED,
+        proposer.id(),
+        undefined,
+        { name: recipient.displayName() },
+      );
+      return true;
+    }
+
+    if (
+      !this.canPlayersTrade(proposer, recipient) ||
+      this.tradeAgreementsFor(proposer).length >=
+        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer ||
+      this.tradeAgreementsFor(recipient).length >=
+        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer
+    ) {
+      return false;
+    }
+
+    this._activeTradeAgreements.push({
+      id: req.id,
+      proposerID: proposer.id(),
+      partnerID: recipient.id(),
+      tradeType: req.tradeType,
+      createdAt: this._ticks,
+    });
+
+    this.displayMessage(
+      "crownfall.trade_accepted",
+      MessageType.ALLIANCE_ACCEPTED,
+      proposer.id(),
+      undefined,
+      { name: recipient.displayName() },
+    );
+    this.displayMessage(
+      "crownfall.trade_accepted",
+      MessageType.ALLIANCE_ACCEPTED,
+      recipient.id(),
+      undefined,
+      { name: proposer.displayName() },
+    );
+    return true;
+  }
+
+  cancelTradeAgreement(actor: Player, agreementID: number): boolean {
+    const idx = this._activeTradeAgreements.findIndex(
+      (t) => t.id === agreementID,
+    );
+    if (idx === -1) return false;
+    const agr = this._activeTradeAgreements[idx];
+    if (agr.proposerID !== actor.id() && agr.partnerID !== actor.id()) {
+      return false;
+    }
+    if (
+      this._ticks - agr.createdAt <
+      CROWNFALL_TRADE_CONFIG.minAgreementDurationTicks
+    ) {
+      return false;
+    }
+    this._activeTradeAgreements.splice(idx, 1);
+    this._tradeCooldowns.set(
+      this.tradePairKey(agr.proposerID, agr.partnerID),
+      this._ticks,
+    );
+    const otherID =
+      agr.proposerID === actor.id() ? agr.partnerID : agr.proposerID;
+    if (this.hasPlayer(otherID)) {
+      this.displayMessage(
+        "crownfall.trade_cancelled",
+        MessageType.ALLIANCE_BROKEN,
+        otherID,
+        undefined,
+        { name: actor.displayName() },
+      );
+    }
+    return true;
+  }
+
+  private tickTradeAgreements(): void {
+    if (this._pendingTradeRequests.length > 0) {
+      this._pendingTradeRequests = this._pendingTradeRequests.filter(
+        (r) => r.expiresAt > this._ticks,
+      );
+    }
+    if (this._config.disableTrade() || this._activeTradeAgreements.length === 0) {
+      return;
+    }
+    const kept: TradeAgreementView[] = [];
+    const foodEnabled = !this._config.disableFood();
+
+    for (const agr of this._activeTradeAgreements) {
+      if (
+        !this.hasPlayer(agr.proposerID) ||
+        !this.hasPlayer(agr.partnerID)
+      ) {
+        continue;
+      }
+      const proposer = this.player(agr.proposerID);
+      const partner = this.player(agr.partnerID);
+      // Suspend/cancel immediately on warfare, embargo, or elimination
+      if (this.arePlayersAtWarOrHostile(proposer, partner)) {
+        this._tradeCooldowns.set(
+          this.tradePairKey(agr.proposerID, agr.partnerID),
+          this._ticks,
+        );
+        if (proposer.isAlive()) {
+          this.displayMessage(
+            "crownfall.trade_war_cancelled",
+            MessageType.ALLIANCE_BROKEN,
+            proposer.id(),
+            undefined,
+            { name: partner.displayName() },
+          );
+        }
+        if (partner.isAlive()) {
+          this.displayMessage(
+            "crownfall.trade_war_cancelled",
+            MessageType.ALLIANCE_BROKEN,
+            partner.id(),
+            undefined,
+            { name: proposer.displayName() },
+          );
+        }
+        continue;
+      }
+
+      kept.push(agr);
+
+      // Execute automatic 1Hz exchanges
+      if (agr.tradeType === TradeAgreementType.ImportFood && foodEnabled) {
+        if (
+          partner.food() >=
+            CROWNFALL_TRADE_CONFIG.minPartnerFoodBufferForExport &&
+          proposer.gold() >= CROWNFALL_TRADE_CONFIG.foodPaymentGoldPerSec
+        ) {
+          const cap = maxFoodStorage(
+            completedStructureLevels(proposer, UnitType.Granary),
+          );
+          partner.addFood(-CROWNFALL_TRADE_CONFIG.foodShipmentPerSec);
+          proposer.addFood(CROWNFALL_TRADE_CONFIG.foodShipmentPerSec, cap);
+          const paid = proposer.removeGold(
+            CROWNFALL_TRADE_CONFIG.foodPaymentGoldPerSec,
+          );
+          partner.addGold(paid);
+        }
+      } else if (agr.tradeType === TradeAgreementType.ExportFood && foodEnabled) {
+        if (
+          proposer.food() >=
+            CROWNFALL_TRADE_CONFIG.minPartnerFoodBufferForExport &&
+          partner.gold() >= CROWNFALL_TRADE_CONFIG.foodPaymentGoldPerSec
+        ) {
+          const cap = maxFoodStorage(
+            completedStructureLevels(partner, UnitType.Granary),
+          );
+          proposer.addFood(-CROWNFALL_TRADE_CONFIG.foodShipmentPerSec);
+          partner.addFood(CROWNFALL_TRADE_CONFIG.foodShipmentPerSec, cap);
+          const paid = partner.removeGold(
+            CROWNFALL_TRADE_CONFIG.foodPaymentGoldPerSec,
+          );
+          proposer.addGold(paid);
+        }
+      } else if (agr.tradeType === TradeAgreementType.CommercePact) {
+        proposer.addGold(CROWNFALL_TRADE_CONFIG.commerceGoldPerSec);
+        partner.addGold(CROWNFALL_TRADE_CONFIG.commerceGoldPerSec);
+      } else if (agr.tradeType === TradeAgreementType.ResearchPact) {
+        proposer.addScience(CROWNFALL_TRADE_CONFIG.researchSciencePerSec);
+        partner.addScience(CROWNFALL_TRADE_CONFIG.researchSciencePerSec);
+        proposer.addGold(CROWNFALL_TRADE_CONFIG.researchGoldPerSec);
+        partner.addGold(CROWNFALL_TRADE_CONFIG.researchGoldPerSec);
+      }
+    }
+
+    this._activeTradeAgreements = kept;
+  }
+
+  activeBountyTargetID(): PlayerID | null {
+    if (this._config.disableBounties()) return null;
+    return this._activeBountyTargetID;
+  }
+
+  private bountyRng(): PseudoRandom {
+    const firstPlayerSeed =
+      this._playersBySmallID.length > 0
+        ? (this._playersBySmallID[0] as PlayerImpl)._pseudo_random.nextInt(
+            1,
+            2_000_000_000,
+          )
+        : 1337;
+    const mixed =
+      (Math.imul(this._ticks + 17, 2654435761) ^
+        Math.imul(this._bountiesTriggered + 1, 2246822519) ^
+        firstPlayerSeed) >>>
+      0;
+    return new PseudoRandom(mixed || 1);
+  }
+
+  triggerBountyEvent(forcedTarget?: Player): boolean {
+    if (
+      this._config.disableBounties() ||
+      this.inSpawnPhase() ||
+      this._activeBountyTargetID !== null
+    ) {
+      return false;
+    }
+
+    let target: Player | null = forcedTarget ?? null;
+    if (!target) {
+      const aliveCountries = this._playersBySmallID.filter(
+        (p) =>
+          p.isAlive() &&
+          isEligibleBountyTargetType(p.type()) &&
+          p.numTilesOwned() >= CROWNFALL_BOUNTY_CONFIG.minEligibleTargetTiles,
+      );
+      // Need at least 2 active countries on the map so someone can claim the bounty
+      if (aliveCountries.length < 2) {
+        return false;
+      }
+      const nonRepeat = aliveCountries.filter(
+        (p) => p.id() !== this._lastBountyTargetID,
+      );
+      const pool = nonRepeat.length > 0 ? nonRepeat : aliveCountries;
+      const rng = this.bountyRng();
+      target = pool[rng.nextInt(0, pool.length)];
+    } else if (!target.isAlive()) {
+      return false;
+    }
+
+    this._activeBountyTargetID = target.id();
+    this._lastBountyTargetID = target.id();
+    this._bountiesTriggered++;
+    this._bountyExpiresTick =
+      this._ticks + CROWNFALL_BOUNTY_CONFIG.bountyDurationTicks;
+    this._bountyTilesConquered.clear();
+
+    const durationSec = Math.ceil(
+      CROWNFALL_BOUNTY_CONFIG.bountyDurationTicks / 10,
+    );
+
+    // Global announcement + dedicated alert to the targeted country
+    this.displayMessage(
+      "crownfall.bounty_activated",
+      MessageType.ATTACK_REQUEST,
+      null,
+      undefined,
+      { name: target.displayName(), sec: `${durationSec}` },
+      undefined,
+      target.id(),
+    );
+    this.displayMessage(
+      "crownfall.bounty_you_are_target",
+      MessageType.ATTACK_FAILED,
+      target.id(),
+      undefined,
+      { sec: `${durationSec}` },
+    );
+
+    this.addUpdate({
+      type: GameUpdateType.Bounty,
+      active: true,
+      targetID: target.id(),
+      targetSmallID: target.smallID(),
+      targetName: target.displayName(),
+      secondsRemaining: durationSec,
+    });
+    return true;
+  }
+
+  private tickBountyEvents(): void {
+    if (this._config.disableBounties()) return;
+
+    if (this._activeBountyTargetID !== null) {
+      if (!this.hasPlayer(this._activeBountyTargetID)) {
+        this._activeBountyTargetID = null;
+        this._bountyTilesConquered.clear();
+        return;
+      }
+      const target = this.player(this._activeBountyTargetID);
+      if (this._ticks >= this._bountyExpiresTick || !target.isAlive()) {
+        const survived = target.isAlive();
+        const targetName = target.displayName();
+        this._activeBountyTargetID = null;
+        this._bountyTilesConquered.clear();
+        this._nextBountyEligibleTick =
+          this._activeGameplayTicks +
+          CROWNFALL_BOUNTY_CONFIG.bountyCooldownTicks;
+
+        if (survived) {
+          this.displayMessage(
+            "crownfall.bounty_expired",
+            MessageType.ALLIANCE_EXPIRED,
+            null,
+            undefined,
+            { name: targetName },
+          );
+        }
+        this.addUpdate({
+          type: GameUpdateType.Bounty,
+          active: false,
+          targetID: null,
+          targetSmallID: null,
+          targetName: "",
+          secondsRemaining: 0,
+        });
+        return;
+      }
+
+      const secLeft = Math.max(
+        0,
+        Math.ceil((this._bountyExpiresTick - this._ticks) / 10),
+      );
+      this.addUpdate({
+        type: GameUpdateType.Bounty,
+        active: true,
+        targetID: target.id(),
+        targetSmallID: target.smallID(),
+        targetName: target.displayName(),
+        secondsRemaining: secLeft,
+      });
+      return;
+    }
+
+    if (this._activeGameplayTicks >= this._nextBountyEligibleTick) {
+      if (!this.triggerBountyEvent()) {
+        // Retry in 30s if not enough eligible countries yet
+        this._nextBountyEligibleTick = this._activeGameplayTicks + 300;
+      }
+    }
+  }
+
+  private resolveBountyElimination(conqueror: Player, conquered: Player): void {
+    if (
+      this._config.disableBounties() ||
+      this._activeBountyTargetID === null ||
+      conquered.id() !== this._activeBountyTargetID
+    ) {
+      return;
+    }
+
+    const isEligibleWinner = (cand: Player): boolean =>
+      cand.isAlive() &&
+      cand !== conquered &&
+      !cand.isOnSameTeam(conquered) &&
+      !cand.isAlliedWith(conquered);
+
+    // Determine top tile-conquering contributor during the bounty window
+    let topContributor: Player | null = null;
+    let topTiles = 0;
+    let totalBountyTiles = 0;
+    for (const [attackerID, count] of this._bountyTilesConquered) {
+      if (!this.hasPlayer(attackerID)) continue;
+      const cand = this.player(attackerID);
+      if (!isEligibleWinner(cand)) continue;
+      totalBountyTiles += count;
+      if (count > topTiles) {
+        topTiles = count;
+        topContributor = cand;
+      }
+    }
+
+    let winner: Player | null = null;
+    const conquerorTiles = this._bountyTilesConquered.get(conqueror.id()) ?? 0;
+    if (isEligibleWinner(conqueror)) {
+      // Award conqueror if they contributed >= 25% of bounty tiles (or no one else took >2x their tiles)
+      if (
+        topContributor === null ||
+        topContributor === conqueror ||
+        (totalBountyTiles > 0 && conquerorTiles * 4 >= totalBountyTiles)
+      ) {
+        winner = conqueror;
+      } else {
+        winner = topContributor;
+      }
+    } else {
+      winner = topContributor;
+    }
+
+    this._activeBountyTargetID = null;
+    this._bountyTilesConquered.clear();
+    this._nextBountyEligibleTick =
+      this._activeGameplayTicks + CROWNFALL_BOUNTY_CONFIG.bountyCooldownTicks;
+
+    if (!winner) {
+      // Self-elimination or friendly exploitation -> no reward granted!
+      this.addUpdate({
+        type: GameUpdateType.Bounty,
+        active: false,
+        targetID: null,
+        targetSmallID: null,
+        targetName: "",
+        secondsRemaining: 0,
+      });
+      return;
+    }
+
+    const priorClaims = this._bountyClaimsByPlayer.get(winner.id()) ?? 0;
+    this._bountyClaimsByPlayer.set(winner.id(), priorClaims + 1);
+
+    const rng = this.bountyRng();
+    const grant = rollScaledBountyReward(
+      rng,
+      this._activeGameplayTicks,
+      winner.numTilesOwned(),
+      this.totalLandTiles(),
+      this._config.maxTroops(winner),
+      priorClaims,
+      !this._config.disableFood(),
+    );
+
+    if (grant.gold > 0n) {
+      winner.addGold(grant.gold);
+    }
+    if (grant.troops > 0) {
+      winner.addTroops(grant.troops);
+    }
+    if (grant.civilians > 0) {
+      winner.addCivilianPopulation(grant.civilians);
+    }
+    if (grant.food > 0) {
+      const cap = maxFoodStorage(
+        completedStructureLevels(winner, UnitType.Granary),
+      );
+      winner.addFood(grant.food, cap);
+    }
+    if (grant.science > 0) {
+      winner.addScience(grant.science);
+    }
+    if (grant.buffDurationTicks > 0) {
+      winner.grantBountyBuff(grant.rewardType, grant.buffDurationTicks);
+    }
+
+    this.displayMessage(
+      `crownfall.bounty_claimed_${grant.rewardType}`,
+      MessageType.CONQUERED_PLAYER,
+      null,
+      undefined,
+      {
+        winner: winner.displayName(),
+        target: conquered.displayName(),
+      },
+      undefined,
+      winner.id(),
+    );
+
+    this.addUpdate({
+      type: GameUpdateType.Bounty,
+      active: false,
+      targetID: null,
+      targetSmallID: null,
+      targetName: "",
+      secondsRemaining: 0,
+      claimedByName: winner.displayName(),
+      rewardType: grant.rewardType,
+    });
+  }
+
   triggerPathDraft(): boolean {
     if (
       this._pathDraftActive ||
@@ -1222,6 +1818,10 @@ export class GameImpl implements Game {
       this.removeInactiveExecutions();
 
       if (!this.inSpawnPhase() && !this._config.gameConfig().tutorial) {
+        if (this._ticks % 10 === 0) {
+          this.tickTradeAgreements();
+          this.tickBountyEvents();
+        }
         if (
           this._ticks % 10 === 0 &&
           this._pendingAllianceActions.length > 0
@@ -1641,6 +2241,18 @@ export class GameImpl implements Game {
       previousOwner._tileChangeVersion++;
       previousOwner._tiles.delete(tile);
       previousOwner._borderTiles.delete(tile);
+      if (
+        this._activeBountyTargetID !== null &&
+        previousOwner.id() === this._activeBountyTargetID &&
+        owner !== previousOwner &&
+        !owner.isOnSameTeam(previousOwner) &&
+        !owner.isAlliedWith(previousOwner)
+      ) {
+        this._bountyTilesConquered.set(
+          owner.id(),
+          (this._bountyTilesConquered.get(owner.id()) ?? 0) + 1,
+        );
+      }
     }
     this._territoryVersion++;
     this._map.setOwnerID(tile, owner.smallID());
@@ -2327,6 +2939,17 @@ export class GameImpl implements Game {
         ...r,
       })),
       allianceActionCooldowns: [...this._allianceActionCooldowns],
+      nextTradeID: this._nextTradeID,
+      pendingTradeRequests: this._pendingTradeRequests.map((r) => ({ ...r })),
+      activeTradeAgreements: this._activeTradeAgreements.map((t) => ({ ...t })),
+      tradeCooldowns: [...this._tradeCooldowns],
+      activeBountyTargetID: this._activeBountyTargetID,
+      bountyExpiresTick: this._bountyExpiresTick,
+      nextBountyEligibleTick: this._nextBountyEligibleTick,
+      lastBountyTargetID: this._lastBountyTargetID,
+      bountiesTriggered: this._bountiesTriggered,
+      bountyTilesConquered: [...this._bountyTilesConquered],
+      bountyClaimsByPlayer: [...this._bountyClaimsByPlayer],
       winner:
         this._winner === null
           ? null
@@ -2394,6 +3017,19 @@ export class GameImpl implements Game {
       ...r,
     }));
     this._allianceActionCooldowns = new Map(s.allianceActionCooldowns);
+    this._nextTradeID = s.nextTradeID;
+    this._pendingTradeRequests = s.pendingTradeRequests.map((r) => ({ ...r }));
+    this._activeTradeAgreements = s.activeTradeAgreements.map((t) => ({
+      ...t,
+    }));
+    this._tradeCooldowns = new Map(s.tradeCooldowns);
+    this._activeBountyTargetID = s.activeBountyTargetID;
+    this._bountyExpiresTick = s.bountyExpiresTick;
+    this._nextBountyEligibleTick = s.nextBountyEligibleTick;
+    this._lastBountyTargetID = s.lastBountyTargetID;
+    this._bountiesTriggered = s.bountiesTriggered;
+    this._bountyTilesConquered = new Map(s.bountyTilesConquered);
+    this._bountyClaimsByPlayer = new Map(s.bountyClaimsByPlayer);
     this._winner =
       s.winner === null
         ? null
@@ -2504,12 +3140,14 @@ export class GameImpl implements Game {
       conqueredId: conquered.id(),
       gold: goldCaptured,
     });
+
+    this.resolveBountyElimination(conqueror, conquered);
   }
 }
 
 export const GameSnapshot = snapshotType({
   name: "Game",
-  version: 4,
+  version: 6,
   migrations: {
     1: (d: Record<string, unknown>) => ({
       ...d,
@@ -2528,6 +3166,23 @@ export const GameSnapshot = snapshotType({
       nextAllianceActionID: 1,
       pendingAllianceActions: [],
       allianceActionCooldowns: [],
+    }),
+    4: (d: Record<string, unknown>) => ({
+      ...d,
+      nextTradeID: 1,
+      pendingTradeRequests: [],
+      activeTradeAgreements: [],
+      tradeCooldowns: [],
+    }),
+    5: (d: Record<string, unknown>) => ({
+      ...d,
+      activeBountyTargetID: null,
+      bountyExpiresTick: 0,
+      nextBountyEligibleTick: CROWNFALL_BOUNTY_CONFIG.firstBountyDelayTicks,
+      lastBountyTargetID: null,
+      bountiesTriggered: 0,
+      bountyTilesConquered: [],
+      bountyClaimsByPlayer: [],
     }),
   },
   schema: z.object({
@@ -2567,6 +3222,34 @@ export const GameSnapshot = snapshotType({
       }),
     ),
     allianceActionCooldowns: z.array(z.tuple([z.string(), zInt()])),
+    nextTradeID: zInt(),
+    pendingTradeRequests: z.array(
+      z.object({
+        id: zInt(),
+        proposerID: z.string(),
+        recipientID: z.string(),
+        tradeType: z.enum(TradeAgreementType),
+        createdAt: zInt(),
+        expiresAt: zInt(),
+      }),
+    ),
+    activeTradeAgreements: z.array(
+      z.object({
+        id: zInt(),
+        proposerID: z.string(),
+        partnerID: z.string(),
+        tradeType: z.enum(TradeAgreementType),
+        createdAt: zInt(),
+      }),
+    ),
+    tradeCooldowns: z.array(z.tuple([z.string(), zInt()])),
+    activeBountyTargetID: z.string().nullable(),
+    bountyExpiresTick: zInt(),
+    nextBountyEligibleTick: zInt(),
+    lastBountyTargetID: z.string().nullable(),
+    bountiesTriggered: zInt(),
+    bountyTilesConquered: z.array(z.tuple([z.string(), zInt()])),
+    bountyClaimsByPlayer: z.array(z.tuple([z.string(), zInt()])),
     winner: z
       .union([
         z.object({ player: zPlayerRef() }),

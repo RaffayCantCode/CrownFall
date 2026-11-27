@@ -163,6 +163,21 @@ export function notableLobbySettings(
       label: translateText("game_settings.crownfall_rebellions"),
       value: disabled,
     });
+  if (c.disableFood)
+    items.push({
+      label: translateText("game_settings.crownfall_food"),
+      value: disabled,
+    });
+  if (c.disableTrade)
+    items.push({
+      label: translateText("game_settings.crownfall_trade"),
+      value: disabled,
+    });
+  if (c.disableBounties)
+    items.push({
+      label: translateText("game_settings.crownfall_bounties"),
+      value: disabled,
+    });
   if (c.anonymizeNames)
     items.push({
       label: translateText("host_modal.anonymous_players"),

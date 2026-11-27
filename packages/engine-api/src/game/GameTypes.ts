@@ -65,6 +65,23 @@ export enum AllianceActionType {
   GoldAid = "gold_aid",
 }
 
+export enum TradeAgreementType {
+  ImportFood = "import_food",
+  ExportFood = "export_food",
+  CommercePact = "commerce_pact",
+  ResearchPact = "research_pact",
+}
+
+export enum BountyRewardType {
+  GoldJackpot = "gold_jackpot",
+  TroopReinforcement = "troop_reinforcement",
+  CivilianBoom = "civilian_boom",
+  FoodReserves = "food_reserves",
+  ScienceBoost = "science_boost",
+  MilitaryEfficiency = "military_efficiency",
+  EconomicAdvantage = "economic_advantage",
+}
+
 export enum NationalProject {
   // Military Path Operations (T1–T4)
   FrontlineConscription = "frontline_conscription",
@@ -292,6 +309,9 @@ export enum UnitType {
   SpyNetwork = "Spy Network",
   OrbitalRadar = "Orbital Radar",
   CyberCommand = "Cyber Command",
+  Farm = "Farm",
+  Bakery = "Bakery",
+  Granary = "Granary",
 }
 
 export enum TrainType {
@@ -327,6 +347,9 @@ export const Structures = unitTypeGroup([
   UnitType.SpyNetwork,
   UnitType.OrbitalRadar,
   UnitType.CyberCommand,
+  UnitType.Farm,
+  UnitType.Bakery,
+  UnitType.Granary,
 ] as const);
 
 export const BuildMenus = unitTypeGroup([

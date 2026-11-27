@@ -10,10 +10,17 @@ import {
 import {
   civilianGrowthPerSecond,
   civilianTaxGoldPerSecond,
+  completedStructureLevels,
   computeStabilityBreakdown,
   CROWNFALL_CONFIG,
   sciencePerSecond,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  applyFoodToPopulationGrowth,
+  computeFoodBreakdown,
+  computeFoodStabilityDelta,
+  CROWNFALL_FOOD_CONFIG,
+} from "@openfront/engine-lib/configuration/CrownfallFood";
 import {
   computeEmigrationPerSecond,
   computeNeighborMigrationShare,
@@ -170,12 +177,94 @@ export class PlayerExecution implements Execution {
     const taxRate = this.player.taxRate();
     const pop = this.player.civilianPopulation();
     const mods = this.player.pathModifiers();
+    const foodEnabled = !this.config.disableFood();
+
+    let foodStabilityDelta = 0;
+    const netTradeFood = this.player.netTradeFoodPerSec();
+    let updatedFoodBreakdown = foodEnabled
+      ? computeFoodBreakdown(
+          this.player,
+          pop,
+          this.player.food(),
+          undefined,
+          undefined,
+          undefined,
+          netTradeFood,
+        )
+      : null;
+
+    if (foodEnabled && updatedFoodBreakdown) {
+      // Note: trade food transfers happen atomically in GameImpl.tickTradeAgreements(),
+      // so here we apply domestic production minus consumption!
+      const domesticNetPerSec =
+        updatedFoodBreakdown.productionPerSec -
+        updatedFoodBreakdown.consumptionPerSec;
+      const nextFood = Math.max(
+        0,
+        Math.min(
+          updatedFoodBreakdown.maxStorage,
+          this.player.food() + domesticNetPerSec,
+        ),
+      );
+      if (nextFood !== this.player.food()) {
+        this.player.setFood(nextFood);
+      }
+      updatedFoodBreakdown = computeFoodBreakdown(
+        this.player,
+        pop,
+        nextFood,
+        undefined,
+        undefined,
+        undefined,
+        netTradeFood,
+      );
+      // AI bots/nations stay protected from starvation spirals unless human
+      if (this.player.type() === PlayerType.Human) {
+        foodStabilityDelta = computeFoodStabilityDelta(
+          updatedFoodBreakdown,
+          completedStructureLevels(this.player, UnitType.Bakery),
+        );
+        const reservePct =
+          updatedFoodBreakdown.maxStorage > 0
+            ? Math.floor(
+                (updatedFoodBreakdown.reserves * 100) /
+                  updatedFoodBreakdown.maxStorage,
+              )
+            : 0;
+        if (updatedFoodBreakdown.status === "famine") {
+          if (this.player.foodWarningBand() !== 2) {
+            this.player.setFoodWarningBand(2);
+            this.mg.displayMessage(
+              "crownfall.food_famine_warning",
+              MessageType.ATTACK_FAILED,
+              this.player.id(),
+            );
+          }
+        } else if (
+          updatedFoodBreakdown.status === "shortage" &&
+          reservePct < CROWNFALL_FOOD_CONFIG.shortageWarningThresholdPercent
+        ) {
+          if (this.player.foodWarningBand() === 0) {
+            this.player.setFoodWarningBand(1);
+            this.mg.displayMessage(
+              "crownfall.food_shortage_warning",
+              MessageType.ATTACK_FAILED,
+              this.player.id(),
+            );
+          }
+        } else if (this.player.foodWarningBand() !== 0) {
+          this.player.setFoodWarningBand(0);
+        }
+      }
+    }
+
     const breakdown = computeStabilityBreakdown(
       this.player,
       taxRate,
       pop,
       this.player.incomingAttacks().length,
       mods,
+      foodStabilityDelta,
     );
 
     const currentStability = this.player.stability();
@@ -195,13 +284,19 @@ export class PlayerExecution implements Execution {
       this.player.setStability(nextStability);
     }
 
-    const popDelta = civilianGrowthPerSecond(
+    const rawPopDelta = civilianGrowthPerSecond(
       this.player,
       pop,
       nextStability,
       taxRate,
       mods,
     );
+    const popDelta =
+      foodEnabled &&
+      updatedFoodBreakdown &&
+      this.player.type() === PlayerType.Human
+        ? applyFoodToPopulationGrowth(rawPopDelta, pop, updatedFoodBreakdown)
+        : rawPopDelta;
     if (popDelta !== 0) {
       this.player.addCivilianPopulation(popDelta);
     }

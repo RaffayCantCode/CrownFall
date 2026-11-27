@@ -436,6 +436,21 @@ export class EngineConfig extends Config {
           (numUnits: number) => Math.min(1_250_000, pow2(numUnits) * 150_000),
           UnitType.ResearchCentre,
         );
+      case UnitType.Farm:
+        return this.costWrapper(
+          (numUnits: number) => Math.min(600_000, pow2(numUnits) * 75_000),
+          UnitType.Farm,
+        );
+      case UnitType.Bakery:
+        return this.costWrapper(
+          (numUnits: number) => Math.min(900_000, pow2(numUnits) * 110_000),
+          UnitType.Bakery,
+        );
+      case UnitType.Granary:
+        return this.costWrapper(
+          (numUnits: number) => Math.min(750_000, pow2(numUnits) * 90_000),
+          UnitType.Granary,
+        );
       case UnitType.SpyNetwork:
       case UnitType.OrbitalRadar:
       case UnitType.CyberCommand:

@@ -27,6 +27,9 @@ const BUILDING_ORDER = {
   spyn: 10,
   orbr: 11,
   cybc: 12,
+  farm: 13,
+  bake: 14,
+  gran: 15,
 } as const satisfies Record<
   Exclude<(typeof otherUnits)[number], "wshp">,
   number
@@ -52,6 +55,9 @@ const UNIT_LABEL_KEYS = {
   spyn: "unit_type.spy_network",
   orbr: "unit_type.orbital_radar",
   cybc: "unit_type.cyber_command",
+  farm: "unit_type.farm",
+  bake: "unit_type.bakery",
+  gran: "unit_type.granary",
   saml: "unit_type.sam_launcher",
   silo: "unit_type.missile_silo",
   wshp: "unit_type.warship",

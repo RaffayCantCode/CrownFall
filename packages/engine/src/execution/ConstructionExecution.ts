@@ -170,6 +170,9 @@ export class ConstructionExecution implements Execution {
       case UnitType.SpyNetwork:
       case UnitType.OrbitalRadar:
       case UnitType.CyberCommand:
+      case UnitType.Farm:
+      case UnitType.Bakery:
+      case UnitType.Granary:
         // Passive structures: aggregated by PlayerExecution / pathModifiers.
         break;
       default:
@@ -194,6 +197,9 @@ export class ConstructionExecution implements Execution {
       case UnitType.SpyNetwork:
       case UnitType.OrbitalRadar:
       case UnitType.CyberCommand:
+      case UnitType.Farm:
+      case UnitType.Bakery:
+      case UnitType.Granary:
         return true;
       default:
         return false;

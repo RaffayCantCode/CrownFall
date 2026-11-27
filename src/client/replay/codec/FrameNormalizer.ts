@@ -86,6 +86,7 @@ const UPDATE_TYPE_ROUTING: Record<
   AllianceActionRequest: "misc",
   AllianceActionReply: "misc",
   Hegemony: "misc",
+  Bounty: "misc",
 };
 
 /**

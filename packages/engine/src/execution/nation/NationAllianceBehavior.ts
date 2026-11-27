@@ -5,6 +5,7 @@ import {
   PlayerType,
   Relation,
   Tick,
+  TradeAgreementType,
 } from "@openfront/engine-api/game/GameTypes";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
@@ -92,6 +93,31 @@ export class NationAllianceBehavior {
       this.game.addExecution(
         new AllianceExtensionExecution(this.player, human.id()),
       );
+    }
+  }
+
+  handleTradeRequests(currentTick: Tick) {
+    if (this.game.config().disableTrade()) return;
+    const pending = this.game.pendingTradeRequestsFor(this.player);
+    if (pending.length === 0) return;
+
+    for (const req of pending) {
+      if (currentTick - req.createdAt < 10) continue;
+      if (!this.game.hasPlayer(req.proposerID)) {
+        this.game.replyTradeRequest(this.player, req.id, false);
+        continue;
+      }
+      const proposer = this.game.player(req.proposerID);
+      const rel = this.player.relation(proposer);
+      const friendlyOrNeutral =
+        this.player.isFriendly(proposer) || rel >= Relation.Neutral;
+      let accept = friendlyOrNeutral;
+      if (accept && req.tradeType === TradeAgreementType.ImportFood) {
+        accept = this.player.food() >= 600;
+      } else if (accept && req.tradeType === TradeAgreementType.ExportFood) {
+        accept = this.player.gold() >= 30_000n;
+      }
+      this.game.replyTradeRequest(this.player, req.id, accept);
     }
   }
 

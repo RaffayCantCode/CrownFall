@@ -18,6 +18,7 @@ import {
   Quads,
   RankedType,
   TaxRate,
+  TradeAgreementType,
   Trios,
   UnitType,
 } from "./game/GameTypes";
@@ -58,7 +59,10 @@ export type Intent =
   | SelectAugmentIntent
   | AllianceActionRequestIntent
   | AllianceActionReplyIntent
-  | ActivateNationalProjectIntent;
+  | ActivateNationalProjectIntent
+  | TradeRequestIntent
+  | TradeReplyIntent
+  | TradeCancelIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -102,6 +106,9 @@ export type SelectAugmentIntent = z.infer<typeof SelectAugmentIntentSchema>;
 export type AllianceActionRequestIntent = z.infer<
   typeof AllianceActionRequestIntentSchema
 >;
+export type TradeRequestIntent = z.infer<typeof TradeRequestIntentSchema>;
+export type TradeReplyIntent = z.infer<typeof TradeReplyIntentSchema>;
+export type TradeCancelIntent = z.infer<typeof TradeCancelIntentSchema>;
 export type AllianceActionReplyIntent = z.infer<
   typeof AllianceActionReplyIntentSchema
 >;
@@ -333,6 +340,9 @@ export const GameConfigSchema = z.object({
   disablePaths: z.boolean().nullable().optional(),
   disableAugments: z.boolean().nullable().optional(),
   disableRebellions: z.boolean().nullable().optional(),
+  disableFood: z.boolean().nullable().optional(),
+  disableTrade: z.boolean().nullable().optional(),
+  disableBounties: z.boolean().nullable().optional(),
   disableClanTags: z.boolean().optional(),
   // Opt-in live game stats reporting for the admin bot. Off by default and has
   // no UI — the admin bot sets it when creating tournament games, since it adds
@@ -643,6 +653,23 @@ export const ActivateNationalProjectIntentSchema = z.object({
   project: z.enum(NationalProject),
 });
 
+export const TradeRequestIntentSchema = z.object({
+  type: z.literal("trade_request"),
+  recipientID: ID,
+  tradeType: z.enum(TradeAgreementType),
+});
+
+export const TradeReplyIntentSchema = z.object({
+  type: z.literal("trade_reply"),
+  requestID: zb.uint(),
+  accept: z.boolean(),
+});
+
+export const TradeCancelIntentSchema = z.object({
+  type: z.literal("trade_cancel"),
+  agreementID: zb.uint(),
+});
+
 export const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
   CancelAttackIntentSchema,
@@ -676,6 +703,9 @@ export const IntentSchema = z.discriminatedUnion("type", [
   AllianceActionRequestIntentSchema,
   AllianceActionReplyIntentSchema,
   ActivateNationalProjectIntentSchema,
+  TradeRequestIntentSchema,
+  TradeReplyIntentSchema,
+  TradeCancelIntentSchema,
 ]);
 
 // StampedIntent = Intent with server-stamped clientID (used in turns and execution)

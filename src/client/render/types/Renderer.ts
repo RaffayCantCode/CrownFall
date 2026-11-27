@@ -94,6 +94,7 @@ export interface PlayerState {
   alliances: AllianceData[];
   outgoingEmojis: EmojiData[];
   civilianPopulation?: number;
+  food?: number;
   science?: number;
   stability?: number;
   rebellionMeter?: number;
@@ -107,6 +108,8 @@ export interface PlayerState {
   activeProject?: string | null;
   activeProjectExpiresTick?: number;
   projectCooldownUntilTick?: number;
+  tradeAgreements?: import("@openfront/engine-api/game/GameUpdates").TradeAgreementView[];
+  incomingTradeRequests?: import("@openfront/engine-api/game/GameUpdates").PendingTradeRequestView[];
 }
 
 export interface UnitState {

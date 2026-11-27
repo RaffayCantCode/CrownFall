@@ -95,6 +95,7 @@ export interface StabilityBreakdown {
   tax: number;
   publicServices: number;
   housing: number;
+  food: number;
   warStrain: number;
   overexpansion: number;
   development: number;
@@ -124,6 +125,7 @@ export function completedStructureLevels(
 export function maxCivilianPopulation(player: PlayerLike): number {
   const tiles = Math.max(0, player.numTilesOwned());
   const housingLevels = completedStructureLevels(player, UnitType.Housing);
+  const bakeryLevels = completedStructureLevels(player, UnitType.Bakery);
   const tileCap = Math.floor(
     pow(tiles, CROWNFALL_CONFIG.tilePopCapExponent) *
       CROWNFALL_CONFIG.tilePopCapScale,
@@ -131,7 +133,8 @@ export function maxCivilianPopulation(player: PlayerLike): number {
   return (
     CROWNFALL_CONFIG.baseCivilianPopCap +
     tileCap +
-    housingLevels * CROWNFALL_CONFIG.housingPopCapPerLevel
+    housingLevels * CROWNFALL_CONFIG.housingPopCapPerLevel +
+    bakeryLevels * 80_000
   );
 }
 
@@ -141,6 +144,7 @@ export function computeStabilityBreakdown(
   civilianPop: number,
   activeIncomingAttacks: number,
   mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
+  foodStabilityDelta: number = 0,
 ): StabilityBreakdown {
   const base = CROWNFALL_CONFIG.baseStabilityTarget;
   const tax = CROWNFALL_CONFIG.tax[taxRate].stabilityDelta;
@@ -183,12 +187,14 @@ export function computeStabilityBreakdown(
     (rawOverexpansion * mods.overexpansionStrainPercent) / 100,
   );
   const development = mods.stabilityTargetDelta;
+  const food = foodStabilityDelta;
 
   const rawTarget =
     base +
     tax +
     publicServices +
     housing +
+    food +
     warStrain +
     overexpansion +
     development;
@@ -206,6 +212,7 @@ export function computeStabilityBreakdown(
     tax,
     publicServices,
     housing,
+    food,
     warStrain,
     overexpansion,
     development,

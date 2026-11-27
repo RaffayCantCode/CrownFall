@@ -10,11 +10,13 @@ import {
   PlayerType,
   TaxRate,
   Tick,
+  TradeAgreementType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
   type AllianceActionReplyUpdate,
   type AllianceActionRequestUpdate,
+  type BountyUpdate,
   GameUpdateType,
 } from "@openfront/engine-api/game/GameUpdates";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
@@ -27,6 +29,15 @@ import {
   stabilityBand,
   type StabilityBreakdown,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  computeFoodBreakdown,
+  computeFoodStabilityDelta,
+  type FoodBreakdown,
+} from "@openfront/engine-lib/configuration/CrownfallFood";
+import {
+  CROWNFALL_TRADE_CONFIG,
+  effectivePartnerPath,
+} from "@openfront/engine-lib/configuration/CrownfallTrade";
 import {
   DEV_PATH_TIERS,
   maxTierForPath,
@@ -61,6 +72,9 @@ import {
   SendDonateTroopsIntentEvent,
   SendSelectDevPathIntentEvent,
   SendSetTaxRateIntentEvent,
+  SendTradeCancelIntentEvent,
+  SendTradeReplyIntentEvent,
+  SendTradeRequestIntentEvent,
   SendUnlockDevTierIntentEvent,
 } from "../../Transport";
 import type { UIState } from "../../UIState";
@@ -97,6 +111,9 @@ const researchCentreIcon = assetUrl("images/ResearchCentreIconWhite.svg");
 const spyNetworkIcon = assetUrl("images/SpyNetworkIconWhite.svg");
 const orbitalRadarIcon = assetUrl("images/OrbitalRadarIconWhite.svg");
 const cyberCommandIcon = assetUrl("images/CyberCommandIconWhite.svg");
+const farmIcon = assetUrl("images/FarmIconWhite.svg");
+const bakeryIcon = assetUrl("images/BakeryIconWhite.svg");
+const granaryIcon = assetUrl("images/GranaryIconWhite.svg");
 
 const PROJECT_ICONS: Record<NationalProject, string> = {
   [NationalProject.FrontlineConscription]: defensePostIcon,
@@ -184,6 +201,27 @@ const CIVIC_BUILDINGS: readonly BuildingMenuEntry[] = [
     labelKey: "unit_type.research_centre",
     roleKey: "crownfall.hud.role_research_centre",
     icon: researchCentreIcon,
+    counted: true,
+  },
+  {
+    unitType: UnitType.Farm,
+    labelKey: "unit_type.farm",
+    roleKey: "crownfall.hud.role_farm",
+    icon: farmIcon,
+    counted: true,
+  },
+  {
+    unitType: UnitType.Bakery,
+    labelKey: "unit_type.bakery",
+    roleKey: "crownfall.hud.role_bakery",
+    icon: bakeryIcon,
+    counted: true,
+  },
+  {
+    unitType: UnitType.Granary,
+    labelKey: "unit_type.granary",
+    roleKey: "crownfall.hud.role_granary",
+    icon: granaryIcon,
     counted: true,
   },
   {
@@ -322,6 +360,8 @@ const ALL_PATHS: readonly {
 type OpenHudMenu =
   | "none"
   | "stability"
+  | "food"
+  | "bounty"
   | "buildings"
   | "arsenal"
   | "paths"
@@ -366,6 +406,8 @@ export class NationalDashboard extends LitElement implements Controller {
 
   @state() private _visible = false;
   @state() private _civilians = 0;
+  @state() private _food = 1500;
+  @state() private _foodBreakdown: FoodBreakdown | null = null;
   @state() private _rebellionMeter = 0;
   @state() private _civilianCap = 0;
   @state() private _science = 0;
@@ -386,6 +428,7 @@ export class NationalDashboard extends LitElement implements Controller {
   @state() private _projectCooldownUntilTick = 0;
   @state() private _selectedAugments: readonly AugmentId[] = [];
   @state() private _ghostStructure: PlayerBuildableUnitType | null = null;
+  @state() private _activeBounty: BountyUpdate | null = null;
   @state() private _allyCount = 0;
   @state() private _buildingsAlert = false;
   @state() private _arsenalAlert = false;
@@ -402,6 +445,9 @@ export class NationalDashboard extends LitElement implements Controller {
   private _incomingActionRequests: AllianceActionRequestUpdate[] = [];
   private _outgoingActionByAlly = new Map<string, OutgoingActionState>();
   private _knownIncomingAllianceCount = 0;
+  private _knownIncomingTradeCount = 0;
+  private _borderSmallIDs = new Set<number>();
+  private _borderRefreshTick = -20;
 
   private onHudSettingsChanged = () => {
     const s = new UserSettings();
@@ -470,6 +516,7 @@ export class NationalDashboard extends LitElement implements Controller {
   init(): void {
     this._visible = false;
     this._openPanel = "none";
+    this._activeBounty = null;
     this._playerBuildables = [];
     this._buildablesRefreshTick = -10;
     this._knownCivicAffordable.clear();
@@ -481,6 +528,9 @@ export class NationalDashboard extends LitElement implements Controller {
     this._incomingActionRequests = [];
     this._outgoingActionByAlly.clear();
     this._knownIncomingAllianceCount = 0;
+    this._knownIncomingTradeCount = 0;
+    this._borderSmallIDs.clear();
+    this._borderRefreshTick = -20;
   }
 
   tick(): void {
@@ -524,6 +574,25 @@ export class NationalDashboard extends LitElement implements Controller {
     }
 
     const civ = myPlayer.civilianPopulation();
+    const food = myPlayer.food();
+    const foodEnabled = !this.game.config().disableFood();
+    const foodBreakdown = foodEnabled
+      ? computeFoodBreakdown(
+          myPlayer,
+          civ,
+          food,
+          undefined,
+          undefined,
+          undefined,
+          myPlayer.netTradeFoodPerSec(),
+        )
+      : null;
+    const foodStabDelta = foodBreakdown
+      ? computeFoodStabilityDelta(
+          foodBreakdown,
+          completedStructureLevels(myPlayer, UnitType.Bakery),
+        )
+      : 0;
     const cap = maxCivilianPopulation(myPlayer);
     const sci = myPlayer.science();
     const stab = myPlayer.stability();
@@ -545,10 +614,13 @@ export class NationalDashboard extends LitElement implements Controller {
       civ,
       myPlayer.incomingAttacks().length,
       mods,
+      foodStabDelta,
     );
 
     if (
       civ !== this._civilians ||
+      food !== this._food ||
+      foodBreakdown?.netPerMin !== this._foodBreakdown?.netPerMin ||
       cap !== this._civilianCap ||
       sci !== this._science ||
       sciRate !== this._scienceRate ||
@@ -570,6 +642,8 @@ export class NationalDashboard extends LitElement implements Controller {
       this._progress.scientificLevel !== progress.scientificLevel
     ) {
       this._civilians = civ;
+      this._food = food;
+      this._foodBreakdown = foodBreakdown;
       this._civilianCap = cap;
       this._science = sci;
       this._scienceRate = sciRate;
@@ -617,8 +691,46 @@ export class NationalDashboard extends LitElement implements Controller {
     }
     this._knownIncomingAllianceCount = incomingProposals;
 
+    const incomingTrades = myPlayer.incomingTradeRequests().length;
+    if (
+      incomingTrades > this._knownIncomingTradeCount &&
+      this._openPanel !== "alliances"
+    ) {
+      this._alliancesAlert = true;
+    }
+    this._knownIncomingTradeCount = incomingTrades;
+
+    if (nowTick - this._borderRefreshTick >= 20) {
+      this._borderRefreshTick = nowTick;
+      myPlayer
+        .borderTiles()
+        .then((bt) => {
+          const myID = myPlayer.smallID();
+          const next = new Set<number>();
+          for (const t of bt.borderTiles) {
+            for (const nb of this.game.neighbors(t)) {
+              const ownerID = this.game.ownerID(nb);
+              if (ownerID !== 0 && ownerID !== myID) {
+                next.add(ownerID);
+              }
+            }
+          }
+          this._borderSmallIDs = next;
+        })
+        .catch(() => {});
+    }
+
     const updates = this.game.updatesSinceLastTick();
     if (!updates) return;
+
+    const bountyUpdates = updates[GameUpdateType.Bounty];
+    if (bountyUpdates && bountyUpdates.length > 0) {
+      const latest = bountyUpdates[bountyUpdates.length - 1];
+      this._activeBounty = latest.active ? latest : null;
+      if (!latest.active && this._openPanel === "bounty") {
+        this._openPanel = "none";
+      }
+    }
 
     const actionReqs = updates[GameUpdateType.AllianceActionRequest];
     if (actionReqs && actionReqs.length > 0) {
@@ -987,6 +1099,11 @@ export class NationalDashboard extends LitElement implements Controller {
       [translateText("crownfall.factor_tax"), b.tax],
       [translateText("crownfall.factor_services"), b.publicServices],
       [translateText("crownfall.factor_housing"), b.housing],
+      ...(this.game?.config().disableFood()
+        ? []
+        : ([[translateText("crownfall.factor_food"), b.food]] as Array<
+            [string, number]
+          >)),
       [translateText("crownfall.factor_war"), b.warStrain],
       [translateText("crownfall.factor_expansion"), b.overexpansion],
       [translateText("crownfall.factor_development"), b.development],
@@ -1019,6 +1136,159 @@ export class NationalDashboard extends LitElement implements Controller {
               </div>
             `,
           )}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderFoodPanel() {
+    if (this._openPanel !== "food" || !this._foodBreakdown) {
+      return nothing;
+    }
+    const f = this._foodBreakdown;
+    const netSign = f.netPerMin > 0 ? `+${f.netPerMin}` : `${f.netPerMin}`;
+    const netColor =
+      f.netPerMin > 0
+        ? "text-emerald-400"
+        : f.netPerMin < 0
+          ? "text-rose-400"
+          : "text-slate-300";
+    const statusLabel = translateText(`crownfall.food_status_${f.status}`);
+    return html`
+      <div
+        class="${this.popoverPositionClass(
+          "narrow",
+        )} rounded-xl border border-amber-400/40 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
+      >
+        <div
+          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2 font-bold text-[#f3d27a]"
+        >
+          <span>${translateText("crownfall.food_panel_title")}</span>
+          <span class="text-[11px] uppercase tracking-wider text-slate-300"
+            >${statusLabel}</span
+          >
+        </div>
+        <div class="space-y-1.5 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[#9aa3b2]">Reserves / Storage</span>
+            <span class="font-mono font-semibold text-white"
+              >${renderNumber(f.reserves)} / ${renderNumber(f.maxStorage)}</span
+            >
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[#9aa3b2]">Production</span>
+            <span class="font-mono font-semibold text-emerald-400"
+              >+${f.productionPerMin}/min</span
+            >
+          </div>
+          ${f.tradeNetPerMin !== 0
+            ? html`<div class="flex items-center justify-between">
+                <span class="text-[#9aa3b2]">Net Trade</span>
+                <span
+                  class="font-mono font-semibold ${f.tradeNetPerMin > 0
+                    ? "text-sky-300"
+                    : "text-amber-300"}"
+                  >${f.tradeNetPerMin > 0
+                    ? `+${f.tradeNetPerMin}`
+                    : f.tradeNetPerMin}/min</span
+                >
+              </div>`
+            : nothing}
+          <div class="flex items-center justify-between">
+            <span class="text-[#9aa3b2]">Civilian Consumption</span>
+            <span class="font-mono font-semibold text-rose-400"
+              >-${f.consumptionPerMin}/min</span
+            >
+          </div>
+          <div class="flex items-center justify-between border-t border-white/10 pt-1.5">
+            <span class="text-[#f4f1ea] font-semibold">Net Balance</span>
+            <span class="font-mono font-bold ${netColor}">${netSign}/min</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderBountyPanel() {
+    if (
+      this._openPanel !== "bounty" ||
+      !this._activeBounty ||
+      this.game.config().disableBounties()
+    ) {
+      return nothing;
+    }
+    const b = this._activeBounty;
+    const myPlayer = this.game.myPlayer();
+    const isMe = myPlayer !== null && myPlayer.id() === b.targetID;
+    const mins = Math.floor(b.secondsRemaining / 60);
+    const secs = `${b.secondsRemaining % 60}`.padStart(2, "0");
+    const targetView =
+      b.targetID !== null
+        ? (this.game.playerViews().find((p) => p.id() === b.targetID) ?? null)
+        : null;
+    const foodEnabled = !this.game.config().disableFood();
+    const rewardPool = [
+      "Gold Jackpot",
+      "Troop Reinforcements",
+      "Civilian Boom",
+      ...(foodEnabled ? ["Food Reserves"] : []),
+      "Science Boost",
+      "45s Military Efficiency",
+      "45s Economic Advantage",
+    ];
+
+    return html`
+      <div
+        class="${this.popoverPositionClass(
+          "narrow",
+        )} rounded-xl border border-rose-500/45 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
+      >
+        <div
+          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2 font-bold text-rose-300"
+        >
+          <span>Global Bounty Event</span>
+          <span class="font-mono text-amber-300">${mins}:${secs}</span>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-[10.5px] uppercase tracking-wider text-[#9aa3b2]">
+                Target Nation
+              </div>
+              <div class="font-bold text-white flex items-center gap-1.5">
+                <span>${b.targetName}</span>
+                ${isMe
+                  ? html`<span
+                      class="rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-rose-200"
+                      >YOU</span
+                    >`
+                  : nothing}
+              </div>
+            </div>
+            ${targetView
+              ? html`<button
+                  type="button"
+                  @click=${() =>
+                    this.eventBus.emit(new GoToPlayerEvent(targetView))}
+                  class="rounded-md border border-rose-400/50 bg-rose-500/20 px-2.5 py-1 text-[11px] font-bold text-rose-200 hover:bg-rose-500/30 cursor-pointer"
+                >
+                  Locate
+                </button>`
+              : nothing}
+          </div>
+          <div class="border-t border-white/10 pt-2">
+            <div class="text-[10.5px] uppercase tracking-wider text-[#9aa3b2] mb-1">
+              1 Random Elimination Reward
+            </div>
+            <div class="flex flex-wrap gap-1">
+              ${rewardPool.map(
+                (label) => html`<span
+                  class="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10.5px] text-slate-200"
+                  >${label}</span
+                >`,
+              )}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -1600,11 +1870,34 @@ export class NationalDashboard extends LitElement implements Controller {
     if (!myPlayer) return nothing;
 
     const alliancesDisabled = this.game.config().disableAlliances();
+    const tradeDisabled = this.game.config().disableTrade();
+    const foodDisabled = this.game.config().disableFood();
     const allPlayers = this.game.playerViews();
 
     const allies = allPlayers.filter(
       (p) => p !== myPlayer && p.isAlive() && myPlayer.isFriendly(p),
     );
+    const tradeAgreements = tradeDisabled ? [] : myPlayer.tradeAgreements();
+    const incomingTradeReqs = tradeDisabled
+      ? []
+      : myPlayer.incomingTradeRequests();
+    const tradedPartnerIDs = new Set<string>(
+      tradeAgreements.map((t) =>
+        t.proposerID === myPlayer.id() ? t.partnerID : t.proposerID,
+      ),
+    );
+    const tradeCandidates = tradeDisabled
+      ? []
+      : allPlayers
+          .filter(
+            (p) =>
+              p !== myPlayer &&
+              p.isAlive() &&
+              p.type() !== PlayerType.Bot &&
+              !tradedPartnerIDs.has(p.id()) &&
+              (myPlayer.isFriendly(p) || this._borderSmallIDs.has(p.smallID())),
+          )
+          .slice(0, 6);
     const allianceMap = new Map(
       myPlayer.alliances().map((a) => [a.other, a] as const),
     );
@@ -1633,10 +1926,12 @@ export class NationalDashboard extends LitElement implements Controller {
         >
           <div>
             <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
-              Alliances
+              ${tradeDisabled ? "Alliances" : "Alliances & Trade"}
             </span>
             <span class="ml-2 text-xs text-[#9aa3b2]">
-              Active Allies: ${allies.length}
+              Allies: ${allies.length}${tradeDisabled
+                ? ""
+                : ` · Trades: ${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer}`}
             </span>
           </div>
           <button
@@ -2153,6 +2448,260 @@ export class NationalDashboard extends LitElement implements Controller {
             }
           </div>
 
+          ${
+            !tradeDisabled
+              ? html`
+                  <div class="border-t border-white/10 pt-2.5 space-y-2.5">
+                    ${
+                      incomingTradeReqs.length > 0
+                        ? html`
+                            <div class="space-y-1.5">
+                              <div class="text-[11px] font-bold uppercase tracking-wider text-sky-300">
+                                Incoming Trade Proposals (${incomingTradeReqs.length})
+                              </div>
+                              ${incomingTradeReqs.map((req) => {
+                                const sender = allPlayers.find(
+                                  (p) => p.id() === req.proposerID,
+                                );
+                                const sName = sender?.displayName() ?? "Nation";
+                                return html`
+                                  <div
+                                    class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-1.5"
+                                  >
+                                    <span class="text-xs font-semibold text-sky-100">
+                                      ${sName}:
+                                      ${translateText(
+                                        `crownfall.trade.type_${req.tradeType}`,
+                                      )}
+                                    </span>
+                                    <div class="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        @click=${() =>
+                                          this.eventBus?.emit(
+                                            new SendTradeReplyIntentEvent(
+                                              req.id,
+                                              true,
+                                            ),
+                                          )}
+                                        class="rounded bg-emerald-500 hover:bg-emerald-400 px-2.5 py-0.5 text-[11px] font-bold text-[#080b12] cursor-pointer"
+                                      >
+                                        Accept
+                                      </button>
+                                      <button
+                                        type="button"
+                                        @click=${() =>
+                                          this.eventBus?.emit(
+                                            new SendTradeReplyIntentEvent(
+                                              req.id,
+                                              false,
+                                            ),
+                                          )}
+                                        class="rounded border border-rose-400/40 bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-rose-200 cursor-pointer"
+                                      >
+                                        Decline
+                                      </button>
+                                    </div>
+                                  </div>
+                                `;
+                              })}
+                            </div>
+                          `
+                        : nothing
+                    }
+
+                    <div>
+                      <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#9aa3b2]">
+                        Active Trade Agreements (${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer})
+                      </div>
+                      ${
+                        tradeAgreements.length === 0
+                          ? html`<div class="text-xs text-slate-400 italic">
+                              No active trade agreements. Propose a pact to any neighbour or ally below.
+                            </div>`
+                          : html`
+                              <div class="space-y-1.5">
+                                ${tradeAgreements.map((agr) => {
+                                  const otherID =
+                                    agr.proposerID === myPlayer.id()
+                                      ? agr.partnerID
+                                      : agr.proposerID;
+                                  const partner = allPlayers.find(
+                                    (p) => p.id() === otherID,
+                                  );
+                                  const pName =
+                                    partner?.displayName() ?? "Partner";
+                                  const myP = effectivePartnerPath(
+                                    myPlayer.primaryPath(),
+                                    myPlayer.type(),
+                                    myPlayer.smallID(),
+                                  );
+                                  const theirP = partner
+                                    ? effectivePartnerPath(
+                                        partner.primaryPath(),
+                                        partner.type(),
+                                        partner.smallID(),
+                                      )
+                                    : null;
+                                  const canCancel =
+                                    this._currentTick - agr.createdAt >=
+                                    CROWNFALL_TRADE_CONFIG.minAgreementDurationTicks;
+                                  return html`
+                                    <div
+                                      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-3 py-1.5"
+                                    >
+                                      <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="font-bold text-white"
+                                          >${pName}</span
+                                        >
+                                        <span class="text-sky-300 font-semibold">
+                                          ${translateText(
+                                            `crownfall.trade.type_${agr.tradeType}`,
+                                          )}
+                                        </span>
+                                        ${
+                                          myP && theirP
+                                            ? html`<span
+                                                class="rounded bg-[#d4af37]/15 border border-[#d4af37]/35 px-1.5 py-0.5 text-[10px] font-mono text-[#f3d27a]"
+                                              >
+                                                ${myP.slice(0, 3).toUpperCase()} ⇄
+                                                ${theirP.slice(0, 3).toUpperCase()}
+                                              </span>`
+                                            : nothing
+                                        }
+                                      </div>
+                                      <button
+                                        type="button"
+                                        ?disabled=${!canCancel}
+                                        @click=${() =>
+                                          this.eventBus?.emit(
+                                            new SendTradeCancelIntentEvent(
+                                              agr.id,
+                                            ),
+                                          )}
+                                        class="rounded border px-2 py-0.5 text-[10.5px] font-semibold ${
+                                          canCancel
+                                            ? "border-rose-500/35 bg-rose-500/10 text-rose-300 cursor-pointer"
+                                            : "border-white/5 bg-slate-800/60 text-slate-500 cursor-not-allowed"
+                                        }"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  `;
+                                })}
+                              </div>
+                            `
+                      }
+                    </div>
+
+                    ${
+                      tradeAgreements.length <
+                        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer &&
+                      tradeCandidates.length > 0
+                        ? html`
+                            <div>
+                              <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#9aa3b2]">
+                                Neighbours &amp; Allies — Propose Trade
+                              </div>
+                              <div class="space-y-1.5">
+                                ${tradeCandidates.map((cand) => {
+                                  const candPath = effectivePartnerPath(
+                                    cand.primaryPath(),
+                                    cand.type(),
+                                    cand.smallID(),
+                                  );
+                                  return html`
+                                    <div
+                                      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-2.5 py-1.5"
+                                    >
+                                      <div class="flex items-center gap-1.5 min-w-0">
+                                        <span class="text-xs font-bold text-[#f4f1ea] truncate">
+                                          ${cand.displayName()}
+                                        </span>
+                                        ${
+                                          candPath
+                                            ? html`<span
+                                                class="rounded bg-white/[0.07] px-1 py-0.5 text-[9.5px] uppercase text-slate-300"
+                                              >
+                                                ${candPath.slice(0, 3)}
+                                              </span>`
+                                            : nothing
+                                        }
+                                      </div>
+                                      <div class="flex flex-wrap items-center gap-1">
+                                        ${
+                                          !foodDisabled
+                                            ? html`
+                                                <button
+                                                  type="button"
+                                                  @click=${() =>
+                                                    this.eventBus?.emit(
+                                                      new SendTradeRequestIntentEvent(
+                                                        cand.id(),
+                                                        TradeAgreementType.ImportFood,
+                                                      ),
+                                                    )}
+                                                  class="rounded border border-lime-400/40 bg-lime-500/10 hover:bg-lime-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-lime-200 cursor-pointer"
+                                                >
+                                                  Import Food
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  @click=${() =>
+                                                    this.eventBus?.emit(
+                                                      new SendTradeRequestIntentEvent(
+                                                        cand.id(),
+                                                        TradeAgreementType.ExportFood,
+                                                      ),
+                                                    )}
+                                                  class="rounded border border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-amber-200 cursor-pointer"
+                                                >
+                                                  Export Food
+                                                </button>
+                                              `
+                                            : nothing
+                                        }
+                                        <button
+                                          type="button"
+                                          @click=${() =>
+                                            this.eventBus?.emit(
+                                              new SendTradeRequestIntentEvent(
+                                                cand.id(),
+                                                TradeAgreementType.CommercePact,
+                                              ),
+                                            )}
+                                          class="rounded border border-[#d4af37]/45 bg-[#d4af37]/15 hover:bg-[#d4af37]/25 px-2 py-0.5 text-[10.5px] font-semibold text-[#f3d27a] cursor-pointer"
+                                        >
+                                          Commerce
+                                        </button>
+                                        <button
+                                          type="button"
+                                          @click=${() =>
+                                            this.eventBus?.emit(
+                                              new SendTradeRequestIntentEvent(
+                                                cand.id(),
+                                                TradeAgreementType.ResearchPact,
+                                              ),
+                                            )}
+                                          class="rounded border border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-sky-200 cursor-pointer"
+                                        >
+                                          Research
+                                        </button>
+                                      </div>
+                                    </div>
+                                  `;
+                                })}
+                              </div>
+                            </div>
+                          `
+                        : nothing
+                    }
+                  </div>
+                `
+              : nothing
+          }
+
         </div>
       </div>
     `;
@@ -2214,7 +2763,9 @@ export class NationalDashboard extends LitElement implements Controller {
       this._openPanel !== "ops";
     const showAlliancesDot =
       this._showDots &&
-      (this._alliancesAlert || this._incomingActionRequests.length > 0) &&
+      (this._alliancesAlert ||
+        this._incomingActionRequests.length > 0 ||
+        (this.game?.myPlayer()?.incomingTradeRequests().length ?? 0) > 0) &&
       this._openPanel !== "alliances";
 
     const isSideRail =
@@ -2249,7 +2800,8 @@ export class NationalDashboard extends LitElement implements Controller {
       >
         <!-- Live Diplomatic Reply Toast Banner (removed — notifications appear in bottom-right events panel) -->
 
-        ${this.renderStabilityPanel()} ${this.renderBuildingsPanel()}
+        ${this.renderStabilityPanel()} ${this.renderFoodPanel()}
+        ${this.renderBountyPanel()} ${this.renderBuildingsPanel()}
         ${this.renderArsenalPanel()} ${this.renderPathsPanel()}
         ${this.renderOpsPanel()} ${this.renderAlliancesPanel()}
 
@@ -2271,6 +2823,40 @@ export class NationalDashboard extends LitElement implements Controller {
                 /${renderNumber(this._civilianCap)}
               </span>
             </div>
+
+            <!-- Food Reserves & Net Rate -->
+            ${
+              this._foodBreakdown !== null
+                ? html`<button
+                    type="button"
+                    @click=${() => this.togglePanel("food")}
+                    class="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition hover:brightness-110 cursor-pointer ${
+                      this._foodBreakdown.status === "famine"
+                        ? "border-rose-500/60 bg-rose-950/70 text-rose-300 animate-pulse"
+                        : this._foodBreakdown.status === "shortage"
+                          ? "border-amber-500/50 bg-amber-950/55 text-amber-300"
+                          : "border-lime-500/35 bg-lime-950/40 text-lime-300"
+                    }"
+                    title="${translateText("crownfall.food_tooltip")}"
+                  >
+                    <span class="font-bold text-[10.5px] tracking-wider">FOOD</span>
+                    <span class="font-mono font-bold text-white"
+                      >${renderNumber(this._foodBreakdown.reserves)}</span
+                    >
+                    <span
+                      class="font-mono text-[10.5px] font-semibold ${
+                        this._foodBreakdown.netPerMin >= 0
+                          ? "text-lime-300"
+                          : "text-amber-300"
+                      }"
+                    >
+                      ${this._foodBreakdown.netPerMin >= 0
+                        ? `+${this._foodBreakdown.netPerMin}/m`
+                        : `${this._foodBreakdown.netPerMin}/m`}
+                    </span>
+                  </button>`
+                : nothing
+            }
 
             <!-- Stability -->
             <button
@@ -2320,6 +2906,63 @@ export class NationalDashboard extends LitElement implements Controller {
 
           <!-- Active Operation / Placement Status Chips -->
           <div class="flex flex-wrap items-center gap-2">
+            ${
+              this._activeBounty !== null &&
+              !this.game.config().disableBounties()
+                ? html`<div
+                    class="inline-flex items-center gap-1 rounded-lg border border-rose-500/60 bg-rose-950/75 px-2 py-0.5 text-xs font-bold text-rose-200"
+                  >
+                    <button
+                      type="button"
+                      @click=${() => this.togglePanel("bounty")}
+                      class="inline-flex items-center gap-1 cursor-pointer hover:text-white"
+                      title="Click for Global Bounty details & reward pool"
+                    >
+                      <span class="text-rose-400">BOUNTY</span>
+                      <span class="text-white max-w-[110px] truncate"
+                        >${this._activeBounty.targetName}</span
+                      >
+                      ${this.game.myPlayer()?.id() ===
+                      this._activeBounty.targetID
+                        ? html`<span
+                            class="rounded bg-rose-500/35 px-1 text-[10px] font-extrabold text-rose-100 animate-pulse"
+                            >YOU</span
+                          >`
+                        : nothing}
+                      <span class="font-mono text-amber-300"
+                        >${Math.floor(
+                          this._activeBounty.secondsRemaining / 60,
+                        )}:${`${this._activeBounty.secondsRemaining % 60}`.padStart(
+                          2,
+                          "0",
+                        )}</span
+                      >
+                    </button>
+                    ${(() => {
+                      const targetView =
+                        this._activeBounty?.targetID !== null
+                          ? (this.game
+                              .playerViews()
+                              .find(
+                                (p) => p.id() === this._activeBounty?.targetID,
+                              ) ?? null)
+                          : null;
+                      return targetView
+                        ? html`<button
+                            type="button"
+                            @click=${() =>
+                              this.eventBus.emit(
+                                new GoToPlayerEvent(targetView),
+                              )}
+                            class="ml-0.5 rounded bg-rose-500/25 px-1.5 py-0.2 text-[10.5px] font-semibold text-rose-100 hover:bg-rose-500/40 cursor-pointer"
+                          >
+                            Locate
+                          </button>`
+                        : nothing;
+                    })()}
+                  </div>`
+                : nothing
+            }
             ${
               this._activeProject !== null
                 ? html`<div

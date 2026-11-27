@@ -186,6 +186,7 @@ export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
     alliances: pu.alliances!,
     outgoingEmojis: pu.outgoingEmojis!,
     civilianPopulation: pu.civilianPopulation,
+    food: pu.food,
     science: pu.science,
     stability: pu.stability,
     rebellionMeter: pu.rebellionMeter,
@@ -199,6 +200,8 @@ export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
     activeProject: pu.activeProject,
     activeProjectExpiresTick: pu.activeProjectExpiresTick,
     projectCooldownUntilTick: pu.projectCooldownUntilTick,
+    tradeAgreements: pu.tradeAgreements?.slice(),
+    incomingTradeRequests: pu.incomingTradeRequests?.slice(),
   };
 }
 

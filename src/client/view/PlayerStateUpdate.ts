@@ -56,6 +56,7 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
     target.outgoingEmojis = pu.outgoingEmojis;
   if (pu.civilianPopulation !== undefined)
     target.civilianPopulation = pu.civilianPopulation;
+  if (pu.food !== undefined) target.food = pu.food;
   if (pu.science !== undefined) target.science = pu.science;
   if (pu.stability !== undefined) target.stability = pu.stability;
   if (pu.rebellionMeter !== undefined) {
@@ -77,4 +78,8 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
     target.activeProjectExpiresTick = pu.activeProjectExpiresTick;
   if (pu.projectCooldownUntilTick !== undefined)
     target.projectCooldownUntilTick = pu.projectCooldownUntilTick;
+  if (pu.tradeAgreements !== undefined)
+    target.tradeAgreements = pu.tradeAgreements.slice();
+  if (pu.incomingTradeRequests !== undefined)
+    target.incomingTradeRequests = pu.incomingTradeRequests.slice();
 }

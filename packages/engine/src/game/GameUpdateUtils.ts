@@ -64,6 +64,7 @@ export function diffPlayerUpdate(
     prev.lastDeleteUnitTick === next.lastDeleteUnitTick &&
     prev.isLobbyCreator === next.isLobbyCreator &&
     prev.civilianPopulation === next.civilianPopulation &&
+    prev.food === next.food &&
     prev.science === next.science &&
     prev.stability === next.stability &&
     prev.rebellionMeter === next.rebellionMeter &&
@@ -83,6 +84,16 @@ export function diffPlayerUpdate(
     ) &&
     stringArrayEqual(prev.selectedAugments, next.selectedAugments) &&
     stringArrayEqual(prev.pendingAugmentChoices, next.pendingAugmentChoices) &&
+    (prev.tradeAgreements?.length ?? 0) ===
+      (next.tradeAgreements?.length ?? 0) &&
+    (prev.tradeAgreements ?? []).every(
+      (t, i) => t.id === next.tradeAgreements?.[i]?.id,
+    ) &&
+    (prev.incomingTradeRequests?.length ?? 0) ===
+      (next.incomingTradeRequests?.length ?? 0) &&
+    (prev.incomingTradeRequests ?? []).every(
+      (r, i) => r.id === next.incomingTradeRequests?.[i]?.id,
+    ) &&
     stringSetEqual(prev.embargoes, next.embargoes) &&
     emojiArrayEqual(prev.outgoingEmojis, next.outgoingEmojis) &&
     attackArrayMembershipEqual(prev.outgoingAttacks, next.outgoingAttacks) &&
@@ -148,6 +159,7 @@ export function diffPlayerUpdate(
     "civilianPopulation",
     prev.civilianPopulation === next.civilianPopulation,
   );
+  setIfDifferent("food", prev.food === next.food);
   setIfDifferent("science", prev.science === next.science);
   setIfDifferent("stability", prev.stability === next.stability);
   setIfDifferent("rebellionMeter", prev.rebellionMeter === next.rebellionMeter);
@@ -184,6 +196,22 @@ export function diffPlayerUpdate(
   setIfDifferent(
     "pendingAugmentChoices",
     stringArrayEqual(prev.pendingAugmentChoices, next.pendingAugmentChoices),
+  );
+  setIfDifferent(
+    "tradeAgreements",
+    (prev.tradeAgreements?.length ?? 0) ===
+      (next.tradeAgreements?.length ?? 0) &&
+      (prev.tradeAgreements ?? []).every(
+        (t, i) => t.id === next.tradeAgreements?.[i]?.id,
+      ),
+  );
+  setIfDifferent(
+    "incomingTradeRequests",
+    (prev.incomingTradeRequests?.length ?? 0) ===
+      (next.incomingTradeRequests?.length ?? 0) &&
+      (prev.incomingTradeRequests ?? []).every(
+        (r, i) => r.id === next.incomingTradeRequests?.[i]?.id,
+      ),
   );
   setIfDifferent("embargoes", stringSetEqual(prev.embargoes, next.embargoes));
   setIfDifferent(

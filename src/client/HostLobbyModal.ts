@@ -128,6 +128,9 @@ export class HostLobbyModal extends BaseModal {
   @state() private crownfallPaths: boolean = true;
   @state() private crownfallAugments: boolean = true;
   @state() private crownfallRebellions: boolean = true;
+  @state() private crownfallFood: boolean = true;
+  @state() private crownfallTrade: boolean = true;
+  @state() private crownfallBounties: boolean = true;
   @state() private anonymizeNames: boolean = false;
   @state() private nameReveals: string[] = [];
   @state() private whitelistEnabled: boolean = false;
@@ -798,6 +801,18 @@ export class HostLobbyModal extends BaseModal {
                     labelKey: "game_settings.crownfall_rebellions",
                     checked: this.crownfallRebellions,
                   },
+                  {
+                    labelKey: "game_settings.crownfall_food",
+                    checked: this.crownfallFood,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_trade",
+                    checked: this.crownfallTrade,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_bounties",
+                    checked: this.crownfallBounties,
+                  },
                   // Host cheats and public listing are mutually exclusive
                   // (the server rejects both combinations), so the controls
                   // disappear while the lobby is listed.
@@ -1168,6 +1183,9 @@ export class HostLobbyModal extends BaseModal {
     this.crownfallPaths = true;
     this.crownfallAugments = true;
     this.crownfallRebellions = true;
+    this.crownfallFood = true;
+    this.crownfallTrade = true;
+    this.crownfallBounties = true;
     this.anonymizeNames = false;
     this.nameReveals = [];
     this.whitelistEnabled = false;
@@ -1296,6 +1314,18 @@ export class HostLobbyModal extends BaseModal {
         break;
       case "game_settings.crownfall_rebellions":
         this.crownfallRebellions = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_food":
+        this.crownfallFood = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_trade":
+        this.crownfallTrade = checked;
+        void this.putGameConfig();
+        break;
+      case "game_settings.crownfall_bounties":
+        this.crownfallBounties = checked;
         void this.putGameConfig();
         break;
       case "host_modal.host_cheats":
@@ -1836,6 +1866,9 @@ export class HostLobbyModal extends BaseModal {
       crownfallPaths: this.crownfallPaths,
       crownfallAugments: this.crownfallAugments,
       crownfallRebellions: this.crownfallRebellions,
+      crownfallFood: this.crownfallFood,
+      crownfallTrade: this.crownfallTrade,
+      crownfallBounties: this.crownfallBounties,
       spawnImmunity: this.spawnImmunity,
       spawnImmunityDurationMinutes: this.spawnImmunityDurationMinutes,
       playerLimit: this.playerLimit,
@@ -1887,6 +1920,9 @@ export class HostLobbyModal extends BaseModal {
     this.crownfallPaths = config.crownfallPaths ?? true;
     this.crownfallAugments = config.crownfallAugments ?? true;
     this.crownfallRebellions = config.crownfallRebellions ?? true;
+    this.crownfallFood = config.crownfallFood ?? true;
+    this.crownfallTrade = config.crownfallTrade ?? true;
+    this.crownfallBounties = config.crownfallBounties ?? true;
 
     if (config.spawnImmunity !== undefined) {
       this.spawnImmunity = config.spawnImmunity;
@@ -2071,6 +2107,9 @@ export class HostLobbyModal extends BaseModal {
             disablePaths: this.crownfallPaths ? null : true,
             disableAugments: this.crownfallAugments ? null : true,
             disableRebellions: this.crownfallRebellions ? null : true,
+            disableFood: this.crownfallFood ? null : true,
+            disableTrade: this.crownfallTrade ? null : true,
+            disableBounties: this.crownfallBounties ? null : true,
             anonymizeNames: this.anonymizeNames,
             nameReveals: this.nameReveals,
             allowedPublicIds: this.whitelistEnabled

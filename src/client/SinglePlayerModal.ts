@@ -165,6 +165,9 @@ const DEFAULT_OPTIONS = {
   crownfallPaths: true,
   crownfallAugments: true,
   crownfallRebellions: true,
+  crownfallFood: true,
+  crownfallTrade: true,
+  crownfallBounties: true,
 } as const;
 
 // A map earns achievements only if it has nations to conquer — the same rule
@@ -262,6 +265,10 @@ export class SinglePlayerModal extends BaseModal {
     DEFAULT_OPTIONS.crownfallAugments;
   @state() private crownfallRebellions: boolean =
     DEFAULT_OPTIONS.crownfallRebellions;
+  @state() private crownfallFood: boolean = DEFAULT_OPTIONS.crownfallFood;
+  @state() private crownfallTrade: boolean = DEFAULT_OPTIONS.crownfallTrade;
+  @state() private crownfallBounties: boolean =
+    DEFAULT_OPTIONS.crownfallBounties;
   // Drives the Start Game button's busy state. Without it the click produces
   // nothing visible until every await in startGame() settles, which reads as
   // a hang rather than as loading whenever the network is slow or absent.
@@ -652,6 +659,18 @@ export class SinglePlayerModal extends BaseModal {
                     labelKey: "game_settings.crownfall_rebellions",
                     checked: this.crownfallRebellions,
                   },
+                  {
+                    labelKey: "game_settings.crownfall_food",
+                    checked: this.crownfallFood,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_trade",
+                    checked: this.crownfallTrade,
+                  },
+                  {
+                    labelKey: "game_settings.crownfall_bounties",
+                    checked: this.crownfallBounties,
+                  },
                 ],
                 inputCards,
               },
@@ -730,6 +749,9 @@ export class SinglePlayerModal extends BaseModal {
       this.crownfallPaths !== DEFAULT_OPTIONS.crownfallPaths ||
       this.crownfallAugments !== DEFAULT_OPTIONS.crownfallAugments ||
       this.crownfallRebellions !== DEFAULT_OPTIONS.crownfallRebellions ||
+      this.crownfallFood !== DEFAULT_OPTIONS.crownfallFood ||
+      this.crownfallTrade !== DEFAULT_OPTIONS.crownfallTrade ||
+      this.crownfallBounties !== DEFAULT_OPTIONS.crownfallBounties ||
       this.disabledUnits.length > 0
     );
   }
@@ -870,6 +892,9 @@ export class SinglePlayerModal extends BaseModal {
     this.crownfallPaths = DEFAULT_OPTIONS.crownfallPaths;
     this.crownfallAugments = DEFAULT_OPTIONS.crownfallAugments;
     this.crownfallRebellions = DEFAULT_OPTIONS.crownfallRebellions;
+    this.crownfallFood = DEFAULT_OPTIONS.crownfallFood;
+    this.crownfallTrade = DEFAULT_OPTIONS.crownfallTrade;
+    this.crownfallBounties = DEFAULT_OPTIONS.crownfallBounties;
   }
 
   private prewarmStartupAssets(): void {
@@ -931,6 +956,9 @@ export class SinglePlayerModal extends BaseModal {
       crownfallPaths: this.crownfallPaths,
       crownfallAugments: this.crownfallAugments,
       crownfallRebellions: this.crownfallRebellions,
+      crownfallFood: this.crownfallFood,
+      crownfallTrade: this.crownfallTrade,
+      crownfallBounties: this.crownfallBounties,
     };
   }
 
@@ -964,6 +992,9 @@ export class SinglePlayerModal extends BaseModal {
     this.crownfallPaths = config.crownfallPaths ?? true;
     this.crownfallAugments = config.crownfallAugments ?? true;
     this.crownfallRebellions = config.crownfallRebellions ?? true;
+    this.crownfallFood = config.crownfallFood ?? true;
+    this.crownfallTrade = config.crownfallTrade ?? true;
+    this.crownfallBounties = config.crownfallBounties ?? true;
 
     await this.loadNationCount();
     if (config.nations !== undefined) {
@@ -1116,6 +1147,15 @@ export class SinglePlayerModal extends BaseModal {
         break;
       case "game_settings.crownfall_rebellions":
         this.crownfallRebellions = checked;
+        break;
+      case "game_settings.crownfall_food":
+        this.crownfallFood = checked;
+        break;
+      case "game_settings.crownfall_trade":
+        this.crownfallTrade = checked;
+        break;
+      case "game_settings.crownfall_bounties":
+        this.crownfallBounties = checked;
         break;
       default:
         break;
@@ -1467,6 +1507,9 @@ export class SinglePlayerModal extends BaseModal {
             ...(this.crownfallPaths ? {} : { disablePaths: true }),
             ...(this.crownfallAugments ? {} : { disableAugments: true }),
             ...(this.crownfallRebellions ? {} : { disableRebellions: true }),
+            ...(this.crownfallFood ? {} : { disableFood: true }),
+            ...(this.crownfallTrade ? {} : { disableTrade: true }),
+            ...(this.crownfallBounties ? {} : { disableBounties: true }),
           },
           lobbyCreatedAt: Date.now(), // ms; server should be authoritative in MP
         },

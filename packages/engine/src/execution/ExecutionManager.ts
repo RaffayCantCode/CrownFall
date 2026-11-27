@@ -34,6 +34,11 @@ import { SelectAugmentExecution } from "./SelectAugmentExecution";
 import { SelectDevPathExecution } from "./SelectDevPathExecution";
 import { SetTaxRateExecution } from "./SetTaxRateExecution";
 import { SpawnExecution } from "./SpawnExecution";
+import {
+  TradeCancelExecution,
+  TradeReplyExecution,
+  TradeRequestExecution,
+} from "./TradeAgreementExecutions";
 import { TargetPlayerExecution } from "./TargetPlayerExecution";
 import { TransportShipExecution } from "./TransportShipExecution";
 import { TribeSpawner } from "./TribeSpawner";
@@ -174,6 +179,16 @@ export class Executor {
         );
       case "activate_national_project":
         return new ActivateNationalProjectExecution(player, intent.project);
+      case "trade_request":
+        return new TradeRequestExecution(
+          player,
+          intent.recipientID,
+          intent.tradeType,
+        );
+      case "trade_reply":
+        return new TradeReplyExecution(player, intent.requestID, intent.accept);
+      case "trade_cancel":
+        return new TradeCancelExecution(player, intent.agreementID);
       default:
         throw new Error(`intent type ${intent} not found`);
     }

@@ -130,11 +130,15 @@ export function findJuiciestTarget(
 
   let best: Player | null = null;
   let bestScore = -Infinity;
+  const activeBountyID = game.activeBountyTargetID();
   for (const s of stats) {
+    const bountyBonus =
+      activeBountyID !== null && s.player.id() === activeBountyID ? 0.75 : 0;
     const juiciness =
       normalize(s.structureCount, structureCounts) +
       normalize(s.troopGapRatio, troopGapRatios) +
-      normalize(s.tiles, tileCounts);
+      normalize(s.tiles, tileCounts) +
+      bountyBonus;
     if (juiciness > bestScore) {
       bestScore = juiciness;
       best = s.player;

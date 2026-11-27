@@ -3,6 +3,7 @@ import {
   AllianceInfo,
   AllPlayers,
   AugmentId,
+  BountyRewardType,
   BuildableUnit,
   Cell,
   ColoredTeams,
@@ -25,6 +26,7 @@ import {
   Team,
   TerraNullius,
   Tick,
+  TradeAgreementType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
@@ -41,12 +43,19 @@ import {
   applyAugmentModifiers,
   MAX_AUGMENTS_PER_PLAYER,
 } from "@openfront/engine-lib/configuration/CrownfallAugments";
+import { applyBountyBuffModifiers } from "@openfront/engine-lib/configuration/CrownfallBounties";
 import {
   applyScienceBuildingModifiers,
   completedStructureLevels,
   CROWNFALL_CONFIG,
   requiredResearchLevels,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import { CROWNFALL_FOOD_CONFIG } from "@openfront/engine-lib/configuration/CrownfallFood";
+import {
+  computeTradeSynergyModifiers,
+  CROWNFALL_TRADE_CONFIG,
+  effectivePartnerPath,
+} from "@openfront/engine-lib/configuration/CrownfallTrade";
 import {
   computeCrownfallPathModifiers,
   type CrownfallPathModifiers,
@@ -173,6 +182,8 @@ export class PlayerImpl implements Player {
 
   /** Crownfall national management state. */
   private _civilianPopulation: number = CROWNFALL_CONFIG.startingCivilianPop;
+  private _food: number = CROWNFALL_FOOD_CONFIG.startingFood;
+  private _foodWarningBand: number = 0; // 0 = ok, 1 = shortage warned, 2 = famine warned
   private _science: number = 0;
   private _stability: number = CROWNFALL_CONFIG.startingStability;
   private _rebellionMeter: number = 0;
@@ -180,6 +191,8 @@ export class PlayerImpl implements Player {
   private _activeProject: NationalProject | null = null;
   private _activeProjectExpiresTick: number = 0;
   private _projectCooldownUntilTick: number = 0;
+  private _activeBountyBuff: BountyRewardType | null = null;
+  private _bountyBuffExpiresTick: number = 0;
   private _taxRate: TaxRate = TaxRate.Normal;
   private _primaryPath: DevelopmentPath | null = null;
   private _militaryLevel: number = 0;
@@ -464,6 +477,7 @@ export class PlayerImpl implements Player {
       lastDeleteUnitTick: this.lastDeleteUnitTick,
       isLobbyCreator: this.isLobbyCreator(),
       civilianPopulation: this._civilianPopulation,
+      food: this._food,
       science: this._science,
       stability: this._stability,
       rebellionMeter: this._rebellionMeter,
@@ -483,6 +497,8 @@ export class PlayerImpl implements Player {
         this._pendingAugmentChoices.length === 0
           ? EMPTY_AUGMENT_ARRAY
           : this._pendingAugmentChoices.slice(),
+      tradeAgreements: this.mg.tradeAgreementsFor(this).slice(),
+      incomingTradeRequests: this.mg.pendingTradeRequestsFor(this).slice(),
     };
   }
 
@@ -1728,6 +1744,9 @@ export class PlayerImpl implements Player {
       case UnitType.SpyNetwork:
       case UnitType.OrbitalRadar:
       case UnitType.CyberCommand:
+      case UnitType.Farm:
+      case UnitType.Bakery:
+      case UnitType.Granary:
         return this.landBasedStructureSpawn(targetTile, validTiles);
       default:
         assertNever(unitType);
@@ -1958,6 +1977,55 @@ export class PlayerImpl implements Player {
     );
   }
 
+  food(): number {
+    return this._food;
+  }
+
+  setFood(food: number): void {
+    this._food = Math.max(0, Math.trunc(food));
+  }
+
+  addFood(delta: number, maxCap?: number): void {
+    const next = Math.max(0, this._food + Math.trunc(delta));
+    this._food =
+      maxCap !== undefined ? Math.min(Math.max(0, Math.trunc(maxCap)), next) : next;
+  }
+
+  foodWarningBand(): number {
+    return this._foodWarningBand;
+  }
+
+  setFoodWarningBand(band: number): void {
+    this._foodWarningBand = Math.trunc(band);
+  }
+
+  grantBountyBuff(buff: BountyRewardType, durationTicks: number): void {
+    this._activeBountyBuff = buff;
+    this._bountyBuffExpiresTick = this.mg.ticks() + Math.max(0, Math.trunc(durationTicks));
+  }
+
+  netTradeFoodPerSec(): number {
+    if (this.mg.config().disableTrade() || this.mg.config().disableFood()) {
+      return 0;
+    }
+    const agreements = this.mg.tradeAgreementsFor(this);
+    if (agreements.length === 0) return 0;
+    let net = 0;
+    for (const agr of agreements) {
+      const isProposer = agr.proposerID === this.id();
+      if (agr.tradeType === TradeAgreementType.ImportFood) {
+        net += isProposer
+          ? CROWNFALL_TRADE_CONFIG.foodShipmentPerSec
+          : -CROWNFALL_TRADE_CONFIG.foodShipmentPerSec;
+      } else if (agr.tradeType === TradeAgreementType.ExportFood) {
+        net += isProposer
+          ? -CROWNFALL_TRADE_CONFIG.foodShipmentPerSec
+          : CROWNFALL_TRADE_CONFIG.foodShipmentPerSec;
+      }
+    }
+    return net;
+  }
+
   science(): number {
     return this._science;
   }
@@ -2115,16 +2183,53 @@ export class PlayerImpl implements Player {
   }
 
   pathModifiers(): CrownfallPathModifiers {
-    return applyScienceBuildingModifiers(
-      this,
-      applyActiveProjectModifiers(
-        applyAugmentModifiers(
-          computeCrownfallPathModifiers(this.pathProgress()),
-          this._selectedAugments,
+    const activeBountyBuff =
+      this._activeBountyBuff !== null &&
+      this.mg.ticks() < this._bountyBuffExpiresTick
+        ? this._activeBountyBuff
+        : null;
+    const base = applyBountyBuffModifiers(
+      applyScienceBuildingModifiers(
+        this,
+        applyActiveProjectModifiers(
+          applyAugmentModifiers(
+            computeCrownfallPathModifiers(this.pathProgress()),
+            this._selectedAugments,
+          ),
+          this.activeProject(),
         ),
-        this.activeProject(),
       ),
+      activeBountyBuff,
     );
+    if (this.mg.config().disableTrade()) {
+      return base;
+    }
+    const agreements = this.mg.tradeAgreementsFor(this);
+    if (agreements.length === 0) {
+      return base;
+    }
+    const myEffPath = effectivePartnerPath(
+      this._primaryPath,
+      this.type(),
+      this._smallID,
+    );
+    const partnerSpecs = agreements
+      .map((agr) => {
+        const otherID =
+          agr.proposerID === this.id() ? agr.partnerID : agr.proposerID;
+        if (!this.mg.hasPlayer(otherID)) return null;
+        const partner = this.mg.player(otherID);
+        return {
+          partnerPath: effectivePartnerPath(
+            partner.primaryPath(),
+            partner.type(),
+            partner.smallID(),
+          ),
+          tradeType: agr.tradeType,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    return computeTradeSynergyModifiers(base, myEffPath, partnerSpecs);
   }
 
   selectedAugments(): readonly AugmentId[] {
@@ -2233,6 +2338,7 @@ export class PlayerImpl implements Player {
         (this.troops() +
           this.numTilesOwned() +
           this._civilianPopulation +
+          this._food * 3 +
           this._science +
           this._stability * 7 +
           this._rebellionMeter * 13 +
@@ -2426,6 +2532,8 @@ export class PlayerImpl implements Player {
         ([type, n]) => [type as UnitType, n],
       ),
       civilianPopulation: this._civilianPopulation,
+      food: this._food,
+      foodWarningBand: this._foodWarningBand,
       science: this._science,
       stability: this._stability,
       taxRate: this._taxRate,
@@ -2446,6 +2554,8 @@ export class PlayerImpl implements Player {
       activeProject: this._activeProject,
       activeProjectExpiresTick: this._activeProjectExpiresTick,
       projectCooldownUntilTick: this._projectCooldownUntilTick,
+      activeBountyBuff: this._activeBountyBuff,
+      bountyBuffExpiresTick: this._bountyBuffExpiresTick,
     };
   }
 
@@ -2520,6 +2630,8 @@ export class PlayerImpl implements Player {
       : (box as null);
     this.numUnitsConstructed = Object.fromEntries(s.numUnitsConstructed);
     this._civilianPopulation = s.civilianPopulation;
+    this._food = s.food;
+    this._foodWarningBand = s.foodWarningBand;
     this._science = s.science;
     this._stability = s.stability;
     this._taxRate = s.taxRate;
@@ -2534,13 +2646,15 @@ export class PlayerImpl implements Player {
     this._activeProject = s.activeProject;
     this._activeProjectExpiresTick = s.activeProjectExpiresTick;
     this._projectCooldownUntilTick = s.projectCooldownUntilTick;
+    this._activeBountyBuff = s.activeBountyBuff;
+    this._bountyBuffExpiresTick = s.bountyBuffExpiresTick;
     this.nearbyMemo = null;
   }
 }
 
 export const PlayerSnapshot = snapshotType({
   name: "Player",
-  version: 6,
+  version: 8,
   migrations: {
     1: (d: Record<string, unknown>) => ({
       ...d,
@@ -2571,6 +2685,16 @@ export const PlayerSnapshot = snapshotType({
       activeProject: null,
       activeProjectExpiresTick: 0,
       projectCooldownUntilTick: 0,
+    }),
+    6: (d: Record<string, unknown>) => ({
+      ...d,
+      food: CROWNFALL_FOOD_CONFIG.startingFood,
+      foodWarningBand: 0,
+    }),
+    7: (d: Record<string, unknown>) => ({
+      ...d,
+      activeBountyBuff: null,
+      bountyBuffExpiresTick: 0,
     }),
   },
   schema: z.object({
@@ -2637,6 +2761,8 @@ export const PlayerSnapshot = snapshotType({
       .optional(),
     numUnitsConstructed: z.array(z.tuple([UnitTypeSchema, zInt()])),
     civilianPopulation: zInt(),
+    food: zInt(),
+    foodWarningBand: zInt(),
     science: zInt(),
     stability: zInt(),
     taxRate: z.enum(TaxRate),
@@ -2651,6 +2777,8 @@ export const PlayerSnapshot = snapshotType({
     activeProject: z.enum(NationalProject).nullable(),
     activeProjectExpiresTick: zInt(),
     projectCooldownUntilTick: zInt(),
+    activeBountyBuff: z.enum(BountyRewardType).nullable(),
+    bountyBuffExpiresTick: zInt(),
   }),
 });
 export type PlayerState = z.infer<typeof PlayerSnapshot.schema>;

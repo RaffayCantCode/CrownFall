@@ -16,10 +16,13 @@
 
 import type { GhostPreviewData, RendererConfig, UnitState } from "../../types";
 import {
+  UT_BAKERY,
   UT_CITY,
   UT_CYBER_COMMAND,
   UT_DEFENSE_POST,
   UT_FACTORY,
+  UT_FARM,
+  UT_GRANARY,
   UT_HOUSING,
   UT_MISSILE_SILO,
   UT_ORBITAL_RADAR,
@@ -50,6 +53,9 @@ const EXTRA_STRUCTURE_ICON_URLS = [
   assetUrl("images/SpyNetworkIconWhite.svg"),
   assetUrl("images/OrbitalRadarIconWhite.svg"),
   assetUrl("images/CyberCommandIconWhite.svg"),
+  assetUrl("images/FarmIconWhite.svg"),
+  assetUrl("images/BakeryIconWhite.svg"),
+  assetUrl("images/GranaryIconWhite.svg"),
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -73,6 +79,9 @@ const STRUCTURE_ORDER = [
   UT_SPY_NETWORK,
   UT_ORBITAL_RADAR,
   UT_CYBER_COMMAND,
+  UT_FARM,
+  UT_BAKERY,
+  UT_GRANARY,
 ] as const;
 
 const ATLAS_COLS = STRUCTURE_ORDER.length;

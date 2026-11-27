@@ -35,6 +35,9 @@ export const UT_RESEARCH_CENTRE = "Research Centre" as const;
 export const UT_SPY_NETWORK = "Spy Network" as const;
 export const UT_ORBITAL_RADAR = "Orbital Radar" as const;
 export const UT_CYBER_COMMAND = "Cyber Command" as const;
+export const UT_FARM = "Farm" as const;
+export const UT_BAKERY = "Bakery" as const;
+export const UT_GRANARY = "Granary" as const;
 
 // ---------------------------------------------------------------------------
 // Derived sets
@@ -53,6 +56,9 @@ export const STRUCTURE_TYPES: ReadonlySet<string> = new Set([
   UT_SPY_NETWORK,
   UT_ORBITAL_RADAR,
   UT_CYBER_COMMAND,
+  UT_FARM,
+  UT_BAKERY,
+  UT_GRANARY,
 ]);
 
 export const NUKE_TYPES: ReadonlySet<string> = new Set([
@@ -116,5 +122,8 @@ export const ALL_UNIT_TYPES = [
   UT_SPY_NETWORK,
   UT_ORBITAL_RADAR,
   UT_CYBER_COMMAND,
+  UT_FARM,
+  UT_BAKERY,
+  UT_GRANARY,
   UT_TRAIN,
 ] as const;

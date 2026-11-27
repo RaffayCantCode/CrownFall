@@ -48,6 +48,11 @@ import { TransportShipExecutionSnapshot } from "../execution/TransportShipExecut
 import { TribeExecutionSnapshot } from "../execution/TribeExecution";
 import { UnlockDevTierExecutionSnapshot } from "../execution/UnlockDevTierExecution";
 import { UpgradeStructureExecutionSnapshot } from "../execution/UpgradeStructureExecution";
+import {
+  TradeCancelExecutionSnapshot,
+  TradeReplyExecutionSnapshot,
+  TradeRequestExecutionSnapshot,
+} from "../execution/TradeAgreementExecutions";
 import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
 import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
 import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
@@ -61,6 +66,9 @@ import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
  */
 export const EXECUTION_SNAPSHOT_TYPES = [
   ActivateNationalProjectExecutionSnapshot,
+  TradeRequestExecutionSnapshot,
+  TradeReplyExecutionSnapshot,
+  TradeCancelExecutionSnapshot,
   AllianceActionReplyExecutionSnapshot,
   AllianceActionRequestExecutionSnapshot,
   AllianceExtensionExecutionSnapshot,

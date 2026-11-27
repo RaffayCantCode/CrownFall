@@ -3,6 +3,7 @@ import { TileRef } from "./GameMap";
 import {
   AllianceActionType,
   AugmentId,
+  BountyRewardType,
   DevelopmentPath,
   EmojiMessage,
   GameUpdates,
@@ -17,6 +18,7 @@ import {
   TaxRate,
   Team,
   Tick,
+  TradeAgreementType,
   TrainType,
   TransportShipState,
   UnitType,
@@ -133,6 +135,7 @@ export enum GameUpdateType {
   AllianceActionRequest,
   AllianceActionReply,
   Hegemony,
+  Bounty,
 }
 
 export type GameUpdate =
@@ -162,7 +165,19 @@ export type GameUpdate =
   | AugmentDraftUpdate
   | AllianceActionRequestUpdate
   | AllianceActionReplyUpdate
-  | HegemonyUpdate;
+  | HegemonyUpdate
+  | BountyUpdate;
+
+export interface BountyUpdate {
+  type: GameUpdateType.Bounty;
+  active: boolean;
+  targetID: PlayerID | null;
+  targetSmallID: number | null;
+  targetName: string;
+  secondsRemaining: number;
+  claimedByName?: string;
+  rewardType?: BountyRewardType;
+}
 
 export interface HegemonyUpdate {
   type: GameUpdateType.Hegemony;
@@ -352,6 +367,7 @@ export interface PlayerUpdate {
   isLobbyCreator?: boolean;
   /** Crownfall national management state (updated at 1Hz). */
   civilianPopulation?: number;
+  food?: number;
   science?: number;
   stability?: number;
   rebellionMeter?: number;
@@ -367,6 +383,26 @@ export interface PlayerUpdate {
   /** Crownfall national augments (hard cap: 5 per player per match). */
   selectedAugments?: AugmentId[];
   pendingAugmentChoices?: AugmentId[];
+  /** Crownfall international trade agreements & incoming requests. */
+  tradeAgreements?: TradeAgreementView[];
+  incomingTradeRequests?: PendingTradeRequestView[];
+}
+
+export interface TradeAgreementView {
+  id: number;
+  proposerID: PlayerID;
+  partnerID: PlayerID;
+  tradeType: TradeAgreementType;
+  createdAt: Tick;
+}
+
+export interface PendingTradeRequestView {
+  id: number;
+  proposerID: PlayerID;
+  recipientID: PlayerID;
+  tradeType: TradeAgreementType;
+  createdAt: Tick;
+  expiresAt: Tick;
 }
 
 export interface AllianceView {

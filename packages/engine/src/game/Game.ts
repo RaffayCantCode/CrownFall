@@ -39,7 +39,9 @@ import {
 } from "@openfront/engine-lib/configuration/CrownfallPaths";
 import {
   GameUpdate,
+  PendingTradeRequestView,
   PlayerUpdate,
+  TradeAgreementView,
   UnitUpdate,
 } from "@openfront/engine-api/game/GameUpdates";
 import {
@@ -136,6 +138,12 @@ export interface UnitParamsMap {
   [UnitType.OrbitalRadar]: Record<string, never>;
 
   [UnitType.CyberCommand]: Record<string, never>;
+
+  [UnitType.Farm]: Record<string, never>;
+
+  [UnitType.Bakery]: Record<string, never>;
+
+  [UnitType.Granary]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type
@@ -412,6 +420,16 @@ export interface Player extends PlayerLike {
   // Crownfall national management
   civilianPopulation(): number;
   addCivilianPopulation(delta: number): void;
+  food(): number;
+  setFood(food: number): void;
+  addFood(delta: number, maxCap?: number): void;
+  netTradeFoodPerSec(): number;
+  foodWarningBand(): number;
+  setFoodWarningBand(band: number): void;
+  grantBountyBuff(
+    buff: import("@openfront/engine-api/game/GameTypes").BountyRewardType,
+    durationTicks: number,
+  ): void;
   science(): number;
   addScience(delta: number): void;
   stability(): number;
@@ -661,6 +679,23 @@ export interface Game extends GameLike {
   pendingAllianceActionsFor(
     recipient: Player,
   ): readonly PendingAllianceActionView[];
+  createTradeRequest(
+    proposer: Player,
+    recipient: Player,
+    tradeType: import("@openfront/engine-api/game/GameTypes").TradeAgreementType,
+  ): number | null;
+  replyTradeRequest(
+    recipient: Player,
+    requestID: number,
+    accept: boolean,
+  ): boolean;
+  cancelTradeAgreement(actor: Player, agreementID: number): boolean;
+  tradeAgreementsFor(player: Player): readonly TradeAgreementView[];
+  pendingTradeRequestsFor(
+    recipient: Player,
+  ): readonly PendingTradeRequestView[];
+  activeBountyTargetID(): PlayerID | null;
+  triggerBountyEvent(forcedTarget?: Player): boolean;
 
   // Units
   unit(id: number): Unit | undefined;

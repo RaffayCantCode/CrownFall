@@ -238,6 +238,7 @@ export class NationExecution implements Execution {
     this.nukeBehavior.followUpStrikes();
     if (ticks % 10 === 0) {
       this.allianceBehavior.handleAllianceActionRequests(ticks);
+      this.allianceBehavior.handleTradeRequests(ticks);
     }
 
     if (ticks % this.attackRate !== this.attackTick) {

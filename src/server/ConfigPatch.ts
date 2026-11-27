@@ -49,6 +49,9 @@ const NULLABLE_KEYS = [
   "disablePaths",
   "disableAugments",
   "disableRebellions",
+  "disableFood",
+  "disableTrade",
+  "disableBounties",
   "customAllianceDuration",
   "waterNukes",
 ] as const satisfies readonly (keyof GameConfig)[];

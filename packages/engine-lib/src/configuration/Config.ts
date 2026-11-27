@@ -194,6 +194,14 @@ export class Config {
   }
 
   isUnitDisabled(unitType: UnitType): boolean {
+    if (
+      this.disableFood() &&
+      (unitType === UnitType.Farm ||
+        unitType === UnitType.Bakery ||
+        unitType === UnitType.Granary)
+    ) {
+      return true;
+    }
     return this._gameConfig.disabledUnits?.includes(unitType) ?? false;
   }
   instantBuild(): boolean {
@@ -215,6 +223,15 @@ export class Config {
   }
   disableRebellions(): boolean {
     return this._gameConfig.disableRebellions ?? false;
+  }
+  disableFood(): boolean {
+    return this._gameConfig.disableFood ?? false;
+  }
+  disableTrade(): boolean {
+    return this._gameConfig.disableTrade ?? false;
+  }
+  disableBounties(): boolean {
+    return this._gameConfig.disableBounties ?? false;
   }
   isRandomSpawn(): boolean {
     return this._gameConfig.randomSpawn;
@@ -269,6 +286,9 @@ export class Config {
       case UnitType.City:
       case UnitType.Factory:
       case UnitType.Housing:
+      case UnitType.Farm:
+      case UnitType.Bakery:
+      case UnitType.Granary:
         info = {
           constructionDuration: this.instantBuild() ? 0 : 2 * 10,
           upgradable: true,

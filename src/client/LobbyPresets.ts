@@ -51,6 +51,9 @@ export const LobbyPresetConfigSchema = z.object({
   crownfallPaths: z.boolean().optional(),
   crownfallAugments: z.boolean().optional(),
   crownfallRebellions: z.boolean().optional(),
+  crownfallFood: z.boolean().optional(),
+  crownfallTrade: z.boolean().optional(),
+  crownfallBounties: z.boolean().optional(),
 
   // Host-specific options
   spawnImmunity: z.boolean().optional(),

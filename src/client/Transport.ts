@@ -10,6 +10,7 @@ import {
   PlayerID,
   TaxRate,
   Tick,
+  TradeAgreementType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import {
@@ -283,6 +284,24 @@ export class MoveWarshipIntentEvent implements GameEvent {
   ) {}
 }
 
+export class SendTradeRequestIntentEvent implements GameEvent {
+  constructor(
+    public readonly recipientID: PlayerID,
+    public readonly tradeType: TradeAgreementType,
+  ) {}
+}
+
+export class SendTradeReplyIntentEvent implements GameEvent {
+  constructor(
+    public readonly requestID: number,
+    public readonly accept: boolean,
+  ) {}
+}
+
+export class SendTradeCancelIntentEvent implements GameEvent {
+  constructor(public readonly agreementID: number) {}
+}
+
 // One-shot marker that this lobby has already sent us to a sibling, so a
 // redirect can never become a bounce.
 const poolRedirectLatch = (gameID: string) => `pool-redirect:${gameID}`;
@@ -414,6 +433,15 @@ export class Transport {
     );
     this.subscribe(SendActivateNationalProjectIntentEvent, (e) =>
       this.onActivateNationalProjectIntent(e),
+    );
+    this.subscribe(SendTradeRequestIntentEvent, (e) =>
+      this.onTradeRequestIntent(e),
+    );
+    this.subscribe(SendTradeReplyIntentEvent, (e) =>
+      this.onTradeReplyIntent(e),
+    );
+    this.subscribe(SendTradeCancelIntentEvent, (e) =>
+      this.onTradeCancelIntent(e),
     );
     this.subscribe(SendWinnerEvent, (e) => this.onSendWinnerEvent(e));
     this.subscribe(SendLiveStatsEvent, (e) => this.onSendLiveStatsEvent(e));
@@ -1151,6 +1179,29 @@ export class Transport {
     this.sendIntent({
       type: "activate_national_project",
       project: event.project,
+    });
+  }
+
+  private onTradeRequestIntent(event: SendTradeRequestIntentEvent) {
+    this.sendIntent({
+      type: "trade_request",
+      recipientID: event.recipientID,
+      tradeType: event.tradeType,
+    });
+  }
+
+  private onTradeReplyIntent(event: SendTradeReplyIntentEvent) {
+    this.sendIntent({
+      type: "trade_reply",
+      requestID: event.requestID,
+      accept: event.accept,
+    });
+  }
+
+  private onTradeCancelIntent(event: SendTradeCancelIntentEvent) {
+    this.sendIntent({
+      type: "trade_cancel",
+      agreementID: event.agreementID,
     });
   }
 

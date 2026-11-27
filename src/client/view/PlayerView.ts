@@ -513,6 +513,34 @@ export class PlayerView implements PlayerLike {
     );
   }
 
+  food(): number {
+    return this.state.food ?? 1_500;
+  }
+
+  tradeAgreements(): readonly import("@openfront/engine-api/game/GameUpdates").TradeAgreementView[] {
+    return this.state.tradeAgreements ?? [];
+  }
+
+  incomingTradeRequests(): readonly import("@openfront/engine-api/game/GameUpdates").PendingTradeRequestView[] {
+    return this.state.incomingTradeRequests ?? [];
+  }
+
+  netTradeFoodPerSec(): number {
+    if (this.game.config().disableTrade() || this.game.config().disableFood()) {
+      return 0;
+    }
+    let net = 0;
+    for (const agr of this.tradeAgreements()) {
+      const isProposer = agr.proposerID === this.id();
+      if (agr.tradeType === "import_food") {
+        net += isProposer ? 15 : -15;
+      } else if (agr.tradeType === "export_food") {
+        net += isProposer ? -15 : 15;
+      }
+    }
+    return net;
+  }
+
   science(): number {
     return this.state.science ?? 0;
   }
