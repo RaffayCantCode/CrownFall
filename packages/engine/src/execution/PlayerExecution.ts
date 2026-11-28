@@ -11,7 +11,10 @@ import {
   civilianGrowthPerSecond,
   civilianTaxGoldPerSecond,
   completedStructureLevels,
+  computeAdministrativeCapacity,
+  computeMilitaryUpkeepPerSecond,
   computeStabilityBreakdown,
+  computeTerritoryIntegrationPerSecond,
   CROWNFALL_CONFIG,
   sciencePerSecond,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
@@ -122,7 +125,10 @@ export class PlayerExecution implements Execution {
 
     const pathMods = this.player.pathModifiers();
     const baseTroopInc = this.config.troopIncreaseRate(this.player);
-    const crisisRegen = crisisTroopRegenPercent(this.player.stability());
+    const crisisRegen = crisisTroopRegenPercent(
+      this.player.stability(),
+      this.player.inFiscalDeficit(),
+    );
     const combinedRegenPercent = (pathMods.troopRegenPercent * crisisRegen) / 100;
     const troopInc =
       combinedRegenPercent === 100
@@ -174,11 +180,28 @@ export class PlayerExecution implements Execution {
 
   private tickCrownfallNationalManagement(ticks: number): void {
     this.player.clearExpiredProject(ticks);
+    const isHuman = this.player.type() === PlayerType.Human;
+    const isManagedNation =
+      isHuman || this.player.type() === PlayerType.Nation;
     const taxRate = this.player.taxRate();
     const pop = this.player.civilianPopulation();
     const mods = this.player.pathModifiers();
     const foodEnabled = !this.config.disableFood();
 
+    // 1. Automatic territory integration (newly conquered land gradually integrates)
+    if (isManagedNation && this.player.unintegratedTiles() > 0) {
+      const adminCap = computeAdministrativeCapacity(this.player, mods);
+      const integratedNow = computeTerritoryIntegrationPerSecond(
+        adminCap,
+        this.player.stability(),
+        mods,
+      );
+      this.player.setUnintegratedTiles(
+        Math.max(0, this.player.unintegratedTiles() - integratedNow),
+      );
+    }
+
+    // 2. Food production, civilian consumption & famine checks (Humans + AI Nations)
     let foodStabilityDelta = 0;
     const netTradeFood = this.player.netTradeFoodPerSec();
     let updatedFoodBreakdown = foodEnabled
@@ -190,6 +213,7 @@ export class PlayerExecution implements Execution {
           undefined,
           undefined,
           netTradeFood,
+          mods.foodProductionPercent,
         )
       : null;
 
@@ -217,13 +241,15 @@ export class PlayerExecution implements Execution {
         undefined,
         undefined,
         netTradeFood,
+        mods.foodProductionPercent,
       );
-      // AI bots/nations stay protected from starvation spirals unless human
-      if (this.player.type() === PlayerType.Human) {
+      if (isManagedNation) {
         foodStabilityDelta = computeFoodStabilityDelta(
           updatedFoodBreakdown,
           completedStructureLevels(this.player, UnitType.Bakery),
         );
+      }
+      if (isHuman) {
         const reservePct =
           updatedFoodBreakdown.maxStorage > 0
             ? Math.floor(
@@ -258,6 +284,20 @@ export class PlayerExecution implements Execution {
       }
     }
 
+    // 3. Active wars, military upkeep & fiscal sustainability
+    let outgoingPlayerWars = 0;
+    let outgoingPlayerTroops = 0;
+    let outgoingWildernessTroops = 0;
+    for (const atk of this.player.outgoingAttacks()) {
+      if (!atk.isActive()) continue;
+      if (atk.target().isPlayer()) {
+        outgoingPlayerWars++;
+        outgoingPlayerTroops += atk.troops();
+      } else {
+        outgoingWildernessTroops += atk.troops();
+      }
+    }
+
     const breakdown = computeStabilityBreakdown(
       this.player,
       taxRate,
@@ -265,7 +305,28 @@ export class PlayerExecution implements Execution {
       this.player.incomingAttacks().length,
       mods,
       foodStabilityDelta,
+      outgoingPlayerWars,
+      this.player.unintegratedTiles(),
+      this.player.inFiscalDeficit(),
     );
+
+    if (isHuman) {
+      if (breakdown.overexpansion <= -12) {
+        if (this.player.expansionWarningBand() === 0) {
+          this.player.setExpansionWarningBand(1);
+          this.mg.displayMessage(
+            "crownfall.overexpansion_warning",
+            MessageType.ATTACK_FAILED,
+            this.player.id(),
+          );
+        }
+      } else if (
+        breakdown.overexpansion > -6 &&
+        this.player.expansionWarningBand() !== 0
+      ) {
+        this.player.setExpansionWarningBand(0);
+      }
+    }
 
     const currentStability = this.player.stability();
     let nextStability = currentStability;
@@ -292,9 +353,7 @@ export class PlayerExecution implements Execution {
       mods,
     );
     const popDelta =
-      foodEnabled &&
-      updatedFoodBreakdown &&
-      this.player.type() === PlayerType.Human
+      foodEnabled && updatedFoodBreakdown && isManagedNation
         ? applyFoodToPopulationGrowth(rawPopDelta, pop, updatedFoodBreakdown)
         : rawPopDelta;
     if (popDelta !== 0) {
@@ -315,6 +374,44 @@ export class PlayerExecution implements Execution {
       this.mg.stats().goldWork(this.player, taxGold);
     }
 
+    // Deduct military & campaign upkeep (unless infinite gold is enabled)
+    const hasInfGold =
+      isHuman &&
+      (this.config.infiniteGold() ||
+        ((this.config.gameConfig().hostCheats?.infiniteGold ?? false) &&
+          this.player.isLobbyCreator()));
+    if (isManagedNation && !hasInfGold) {
+      const upkeepGold = computeMilitaryUpkeepPerSecond(
+        this.player,
+        outgoingPlayerTroops,
+        outgoingWildernessTroops,
+        mods,
+        this.config.goldMultiplier(),
+      );
+      if (upkeepGold > 0n) {
+        const passiveSecGold = this.config.goldAdditionRate(this.player) * 10n;
+        const availableBeforeUpkeep = this.player.gold();
+        const enteredDeficit =
+          availableBeforeUpkeep < upkeepGold &&
+          upkeepGold > taxGold + passiveSecGold;
+        this.player.removeGold(upkeepGold);
+        if (enteredDeficit !== this.player.inFiscalDeficit()) {
+          this.player.setFiscalDeficit(enteredDeficit);
+          if (enteredDeficit && isHuman) {
+            this.mg.displayMessage(
+              "crownfall.fiscal_deficit_warning",
+              MessageType.ATTACK_FAILED,
+              this.player.id(),
+            );
+          }
+        }
+      } else if (this.player.inFiscalDeficit()) {
+        this.player.setFiscalDeficit(false);
+      }
+    } else if (this.player.inFiscalDeficit()) {
+      this.player.setFiscalDeficit(false);
+    }
+
     const sciGain = sciencePerSecond(
       this.player,
       updatedPop,
@@ -325,8 +422,8 @@ export class PlayerExecution implements Execution {
       this.player.addScience(sciGain);
     }
 
-    // Phase 5: Internal crises, cross-border migration & rebellions (humans only).
-    if (this.player.type() === PlayerType.Human) {
+    // Phase 5: Internal crises, cross-border migration & rebellions (Humans + AI Nations).
+    if (isManagedNation) {
       this.tickCrownfallCrises(ticks, nextStability);
     }
   }
@@ -388,6 +485,7 @@ export class PlayerExecution implements Execution {
     }
 
     if (
+      this.player.type() === PlayerType.Human &&
       prevMeter < CROWNFALL_CRISIS_CONFIG.rebellionWarningThreshold &&
       nextMeter >= CROWNFALL_CRISIS_CONFIG.rebellionWarningThreshold
     ) {

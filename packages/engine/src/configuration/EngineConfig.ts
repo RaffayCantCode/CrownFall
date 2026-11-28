@@ -13,6 +13,7 @@ import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { TeamCountConfig } from "@openfront/engine-api/Schemas";
 import { NukeType } from "@openfront/engine-api/StatsSchemas";
 import { Config } from "@openfront/engine-lib/configuration/Config";
+import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { exp, log, pow2 } from "@openfront/engine-lib/DetMath";
 import {
   assertNever,
@@ -510,8 +511,18 @@ export class EngineConfig extends Config {
     }
   }
 
+  public defaultStartingTreasury(): Gold {
+    return this._gameConfig.tutorial
+      ? 0n
+      : CROWNFALL_CONFIG.defaultStartingTreasury;
+  }
+
   private startingGoldFor(playerInfo: PlayerInfo): Gold {
-    const base = BigInt(this._gameConfig.startingGold ?? 0);
+    const base =
+      this._gameConfig.startingGold !== undefined &&
+      this._gameConfig.startingGold !== null
+        ? BigInt(this._gameConfig.startingGold)
+        : this.defaultStartingTreasury();
     const hc = this._gameConfig.hostCheats;
     if (hc?.startingGold && playerInfo.isLobbyCreator) {
       return base + BigInt(hc.startingGold);
@@ -764,9 +775,9 @@ export class EngineConfig extends Config {
     const multiplier = this.goldMultiplierFor(player);
     let baseRate: bigint;
     if (player.type() === PlayerType.Bot) {
-      baseRate = 50n;
+      baseRate = 30n;
     } else {
-      baseRate = 100n;
+      baseRate = 55n;
     }
     return BigInt(Math.floor(Number(baseRate) * multiplier));
   }

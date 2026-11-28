@@ -68,6 +68,8 @@ export function diffPlayerUpdate(
     prev.science === next.science &&
     prev.stability === next.stability &&
     prev.rebellionMeter === next.rebellionMeter &&
+    prev.unintegratedTiles === next.unintegratedTiles &&
+    prev.inFiscalDeficit === next.inFiscalDeficit &&
     prev.activeProject === next.activeProject &&
     prev.activeProjectExpiresTick === next.activeProjectExpiresTick &&
     prev.projectCooldownUntilTick === next.projectCooldownUntilTick &&
@@ -163,6 +165,14 @@ export function diffPlayerUpdate(
   setIfDifferent("science", prev.science === next.science);
   setIfDifferent("stability", prev.stability === next.stability);
   setIfDifferent("rebellionMeter", prev.rebellionMeter === next.rebellionMeter);
+  setIfDifferent(
+    "unintegratedTiles",
+    prev.unintegratedTiles === next.unintegratedTiles,
+  );
+  setIfDifferent(
+    "inFiscalDeficit",
+    prev.inFiscalDeficit === next.inFiscalDeficit,
+  );
   setIfDifferent("activeProject", prev.activeProject === next.activeProject);
   setIfDifferent(
     "activeProjectExpiresTick",

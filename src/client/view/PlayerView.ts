@@ -27,7 +27,10 @@ import {
 import { PlayerLike } from "@openfront/engine-api/game/ReadViews";
 import { ClientID } from "@openfront/engine-api/Schemas";
 import { applyAugmentModifiers } from "@openfront/engine-lib/configuration/CrownfallAugments";
-import { CROWNFALL_CONFIG } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import {
+  applyScienceBuildingModifiers,
+  CROWNFALL_CONFIG,
+} from "@openfront/engine-lib/configuration/CrownfallConfig";
 import { applyActiveProjectModifiers } from "@openfront/engine-lib/configuration/CrownfallProjects";
 import {
   computeCrownfallPathModifiers,
@@ -553,6 +556,14 @@ export class PlayerView implements PlayerLike {
     return this.state.rebellionMeter ?? 0;
   }
 
+  unintegratedTiles(): number {
+    return this.state.unintegratedTiles ?? 0;
+  }
+
+  inFiscalDeficit(): boolean {
+    return this.state.inFiscalDeficit ?? false;
+  }
+
   taxRate(): TaxRate {
     return (this.state.taxRate as TaxRate | undefined) ?? TaxRate.Normal;
   }
@@ -599,13 +610,20 @@ export class PlayerView implements PlayerLike {
   }
 
   pathModifiers(): CrownfallPathModifiers {
-    return applyActiveProjectModifiers(
-      applyAugmentModifiers(
-        computeCrownfallPathModifiers(this.pathProgress()),
-        this.selectedAugments(),
+    return applyScienceBuildingModifiers(
+      this,
+      applyActiveProjectModifiers(
+        applyAugmentModifiers(
+          computeCrownfallPathModifiers(this.pathProgress()),
+          this.selectedAugments(),
+        ),
+        this.activeProject(),
       ),
-      this.activeProject(),
     );
+  }
+
+  outgoingPlayerWarsCount(): number {
+    return this.state.outgoingAttacks.filter((a) => a.targetID !== 0).length;
   }
 
   isAlliedWith(other: PlayerView): boolean {

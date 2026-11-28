@@ -13,6 +13,8 @@ import {
   TerraNullius,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
+import { computeStabilityBreakdown } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import { computeFoodBreakdown } from "@openfront/engine-lib/configuration/CrownfallFood";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import { Versioned } from "@openfront/engine-lib/snapshot/SnapshotType";
 import {
@@ -379,6 +381,9 @@ export class NationAttackBehavior extends AiAttackBehavior {
     // Maybe save up troops until we reach the trigger ratio
     if (!this.hasTriggerRatioTroops() && !this.random.chance(10)) return;
 
+    // Pause optional offensive wars when the nation needs to consolidate territory, stability, food, or treasury
+    if (this.shouldConsolidateBeforeOffensiveWar()) return;
+
     // Get attack strategies in priority order based on difficulty
     const strategies = this.getAttackStrategies(
       borderingFriends,
@@ -388,6 +393,53 @@ export class NationAttackBehavior extends AiAttackBehavior {
     for (const strategy of strategies) {
       if (strategy()) return;
     }
+  }
+
+  /**
+   * Returns true if the AI Nation is suffering severe internal instability, famine,
+   * extreme unintegrated territory strain, or empty treasury under military deficit,
+   * causing it to consolidate before launching new optional offensive wars.
+   */
+  private shouldConsolidateBeforeOffensiveWar(): boolean {
+    const p = this.player;
+    if (
+      p === null ||
+      typeof p.stability !== "function" ||
+      typeof p.pathModifiers !== "function"
+    ) {
+      return false;
+    }
+    if (p.stability() < 34 || p.rebellionMeter() >= 45) {
+      return true;
+    }
+    if (p.inFiscalDeficit() && p.gold() < 20_000n) {
+      return true;
+    }
+    const config = this.game.config();
+    const mods = p.pathModifiers();
+    if (!(config.disableFood?.() ?? true) && p.food() <= 0) {
+      const fb = computeFoodBreakdown(
+        p,
+        p.civilianPopulation(),
+        p.food(),
+        undefined,
+        undefined,
+        undefined,
+        p.netTradeFoodPerSec(),
+        mods.foodProductionPercent,
+      );
+      if (fb.status === "famine") {
+        return true;
+      }
+    }
+    const sb = computeStabilityBreakdown(
+      p,
+      p.taxRate(),
+      p.civilianPopulation(),
+      p.incomingAttacks().length,
+      mods,
+    );
+    return p.unintegratedTiles() > 0 && sb.overexpansion <= -16;
   }
 
   private getAttackStrategies(

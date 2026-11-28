@@ -8,6 +8,15 @@ import {
   Structures,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
+import {
+  completedStructureLevels,
+  computeStabilityBreakdown,
+} from "@openfront/engine-lib/configuration/CrownfallConfig";
+import { computeFoodBreakdown } from "@openfront/engine-lib/configuration/CrownfallFood";
+import {
+  nextTierGoldCost,
+  nextTierScienceCost,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   readVersioned,
@@ -77,6 +86,30 @@ function getStructureRatios(
     [UnitType.MissileSilo]: {
       ratioPerCity: 0.2,
       perceivedCostIncreasePerOwned: 1,
+    },
+    [UnitType.Farm]: {
+      ratioPerCity: 0.65,
+      perceivedCostIncreasePerOwned: 0.5,
+    },
+    [UnitType.PublicServices]: {
+      ratioPerCity: 0.5,
+      perceivedCostIncreasePerOwned: 0.5,
+    },
+    [UnitType.Housing]: {
+      ratioPerCity: 0.35,
+      perceivedCostIncreasePerOwned: 0.6,
+    },
+    [UnitType.ResearchCentre]: {
+      ratioPerCity: 0.35,
+      perceivedCostIncreasePerOwned: 0.6,
+    },
+    [UnitType.Bakery]: {
+      ratioPerCity: 0.25,
+      perceivedCostIncreasePerOwned: 0.7,
+    },
+    [UnitType.Granary]: {
+      ratioPerCity: 0.2,
+      perceivedCostIncreasePerOwned: 0.8,
     },
   };
 }
@@ -649,10 +682,25 @@ export class NationStructureBehavior {
       return true;
     }
 
-    // Build order for non-city structures (priority order)
+    if (this.maybeHandleNationalSustainabilityNeeds()) {
+      return true;
+    }
+
+    // Hold routine building spend briefly when a Primary Development Path tier already has enough Science
+    if (this.isSavingForReadyPathUnlock()) {
+      return false;
+    }
+
+    // Build order for non-city structures (priority order: trade economy first, then national infrastructure & defense)
     const buildOrder: UnitType[] = [
       UnitType.Port,
       UnitType.Factory,
+      UnitType.Farm,
+      UnitType.PublicServices,
+      UnitType.Housing,
+      UnitType.ResearchCentre,
+      UnitType.Bakery,
+      UnitType.Granary,
       UnitType.SAMLauncher,
       UnitType.MissileSilo,
     ];
@@ -700,6 +748,140 @@ export class NationStructureBehavior {
       return true;
     }
 
+    return false;
+  }
+
+  /**
+   * Responds to urgent national sustainability problems (food shortages, low stability,
+   * administrative overextension, or fiscal deficit) before routine expansion spending.
+   */
+  private maybeHandleNationalSustainabilityNeeds(): boolean {
+    const config = this.game.config();
+    const player = this.player;
+    if (
+      typeof player.stability !== "function" ||
+      typeof player.pathModifiers !== "function" ||
+      typeof player.civilianPopulation !== "function"
+    ) {
+      return false;
+    }
+    const mods = player.pathModifiers();
+
+    // 1. Food sustainability: build/upgrade Farm or Bakery when supply lags behind population
+    if (!(config.disableFood?.() ?? true)) {
+      const fb = computeFoodBreakdown(
+        player,
+        player.civilianPopulation(),
+        player.food(),
+        undefined,
+        undefined,
+        undefined,
+        player.netTradeFoodPerSec(),
+        mods.foodProductionPercent,
+      );
+      const needsFood =
+        fb.status === "famine" ||
+        fb.status === "shortage" ||
+        (fb.netPerSec <= 1 && fb.reserves * 100 < fb.maxStorage * 65);
+      if (needsFood) {
+        const farms = completedStructureLevels(player, UnitType.Farm);
+        const bakeries = completedStructureLevels(player, UnitType.Bakery);
+        if (
+          farms >= 2 &&
+          bakeries * 2 < farms &&
+          !config.isUnitDisabled(UnitType.Bakery) &&
+          this.maybeSpawnUrgentStructure(UnitType.Bakery)
+        ) {
+          return true;
+        }
+        if (
+          !config.isUnitDisabled(UnitType.Farm) &&
+          this.maybeSpawnUrgentStructure(UnitType.Farm)
+        ) {
+          return true;
+        }
+      }
+    }
+
+    // 2. Administrative & Stability sustainability: build Public Services under unrest or overexpansion
+    if (!config.isUnitDisabled(UnitType.PublicServices)) {
+      const sb = computeStabilityBreakdown(
+        player,
+        player.taxRate(),
+        player.civilianPopulation(),
+        player.incomingAttacks().length,
+        mods,
+      );
+      if (
+        (player.stability() < 54 || sb.overexpansion <= -6) &&
+        this.maybeSpawnUrgentStructure(UnitType.PublicServices)
+      ) {
+        return true;
+      }
+    }
+
+    // 3. Fiscal sustainability: build a Power Plant if running a military deficit
+    if (
+      player.inFiscalDeficit() &&
+      !config.isUnitDisabled(UnitType.Housing) &&
+      this.maybeSpawnUrgentStructure(UnitType.Housing)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private isSavingForReadyPathUnlock(): boolean {
+    const config = this.game.config();
+    const player = this.player;
+    if (
+      (config.disablePaths?.() ?? true) ||
+      typeof player.primaryPath !== "function" ||
+      typeof player.science !== "function"
+    ) {
+      return false;
+    }
+    const primary = player.primaryPath();
+    if (primary === null) return false;
+    const progress = player.pathProgress();
+    // Only hold structure spend briefly for the nation's opening Tier 1 breakthrough;
+    // higher tiers (300k–2.2M Gold) are funded by building Ports, Factories, and Cities first!
+    const totalUnlocked =
+      progress.militaryLevel +
+      progress.politicalLevel +
+      progress.scientificLevel;
+    if (totalUnlocked > 0) return false;
+    const sciCost = nextTierScienceCost(progress, primary);
+    const goldCost = nextTierGoldCost(progress, primary);
+    if (sciCost === null || goldCost === null) return false;
+    if (player.science() < sciCost) return false;
+    const targetGold = (goldCost * 125n) / 100n;
+    return (
+      player.gold() < targetGold &&
+      isSaveUpWithinReach(this.game, player, targetGold)
+    );
+  }
+
+  private maybeSpawnUrgentStructure(type: UnitType): boolean {
+    const realCost = this.cost(type);
+    if (this.player.gold() < (realCost * 105n) / 100n) {
+      return false;
+    }
+    const existing = this.player.units(type);
+    const tile = this.placement.spawnTile(type);
+    if (tile !== null && this.player.canBuild(type, tile) !== false) {
+      this.game.addExecution(
+        new ConstructionExecution(this.player, type, tile),
+      );
+      return true;
+    }
+    if (
+      existing.length > 0 &&
+      this.game.config().unitInfo(type).upgradable === true
+    ) {
+      return this.maybeUpgradeStructure(existing);
+    }
     return false;
   }
 

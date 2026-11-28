@@ -123,9 +123,45 @@ export class NationStructurePlacement {
         return this.portValue();
       case UnitType.SAMLauncher:
         return this.samLauncherValue();
+      case UnitType.Farm:
+      case UnitType.Bakery:
+      case UnitType.Granary:
+      case UnitType.PublicServices:
+      case UnitType.Housing:
+      case UnitType.ResearchCentre:
+      case UnitType.SpyNetwork:
+      case UnitType.OrbitalRadar:
+      case UnitType.CyberCommand:
+        return this.civicInteriorValue(type);
       default:
         throw new Error(`Value function not implemented for ${type}`);
     }
+  }
+
+  private civicInteriorValue(type: UnitType): (tile: TileRef) => number {
+    const game = this.game;
+    const borderTiles = this.player.borderTiles();
+    const otherUnits = this.player.units(type);
+    const { borderSpacing, structureSpacing } = this.spacingConstants();
+
+    return (tile) => {
+      let w = 1;
+      const closestBorderDist = nearestTileDistCapped(
+        game,
+        borderTiles,
+        tile,
+        borderSpacing,
+      );
+      w += Math.min(closestBorderDist, borderSpacing);
+
+      if (otherUnits.length > 0) {
+        const otherTiles: Set<TileRef> = new Set(otherUnits.map((u) => u.tile()));
+        otherTiles.delete(tile);
+        const d = nearestTileDist(game, otherTiles, tile);
+        if (d !== Infinity) w += Math.min(d, structureSpacing);
+      }
+      return w;
+    };
   }
 
   /**

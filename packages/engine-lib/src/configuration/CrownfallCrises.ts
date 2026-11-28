@@ -49,20 +49,69 @@ export const CROWNFALL_CRISIS_CONFIG = {
 } as const;
 
 /**
- * Returns the troop regeneration multiplier (percent) for the current stability.
+ * Returns the troop regeneration multiplier (percent) for the current stability & fiscal state.
  */
-export function crisisTroopRegenPercent(stability: number): number {
+export function crisisTroopRegenPercent(
+  stability: number,
+  inFiscalDeficit: boolean = false,
+): number {
   const band: StabilityBand = stabilityBand(stability);
+  let pct = 100;
   if (band === "rebellion") {
-    return CROWNFALL_CRISIS_CONFIG.rebellionTroopRegenPercent;
+    pct = CROWNFALL_CRISIS_CONFIG.rebellionTroopRegenPercent;
+  } else if (band === "crisis") {
+    pct = CROWNFALL_CRISIS_CONFIG.crisisTroopRegenPercent;
+  } else if (band === "unrest") {
+    pct = CROWNFALL_CRISIS_CONFIG.unrestTroopRegenPercent;
   }
-  if (band === "crisis") {
-    return CROWNFALL_CRISIS_CONFIG.crisisTroopRegenPercent;
+  if (inFiscalDeficit) {
+    pct = Math.max(25, Math.floor((pct * 70) / 100));
   }
+  return pct;
+}
+
+/**
+ * Returns the combat attacker-loss multiplier (percent; >100 = higher losses, <100 = high-morale bonus)
+ * driven by national stability and military fiscal readiness.
+ */
+export function crisisAttackerLossPercent(
+  stability: number,
+  inFiscalDeficit: boolean = false,
+): number {
+  const band: StabilityBand = stabilityBand(stability);
+  let pct = stability >= 80 ? 95 : 100;
   if (band === "unrest") {
-    return CROWNFALL_CRISIS_CONFIG.unrestTroopRegenPercent;
+    pct = 110;
+  } else if (band === "crisis") {
+    pct = 122;
+  } else if (band === "rebellion") {
+    pct = 135;
   }
-  return 100;
+  if (inFiscalDeficit) {
+    pct += 15;
+  }
+  return pct;
+}
+
+/**
+ * Returns the offensive push-speed multiplier (percent; <100 = slower campaign push)
+ * driven by severe instability or unpaid supply lines.
+ */
+export function crisisAttackSpeedPercent(
+  stability: number,
+  inFiscalDeficit: boolean = false,
+): number {
+  const band: StabilityBand = stabilityBand(stability);
+  let pct = 100;
+  if (band === "crisis") {
+    pct = 88;
+  } else if (band === "rebellion") {
+    pct = 80;
+  }
+  if (inFiscalDeficit) {
+    pct = Math.max(55, pct - 15);
+  }
+  return pct;
 }
 
 /**

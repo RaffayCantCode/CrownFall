@@ -409,6 +409,7 @@ export class NationalDashboard extends LitElement implements Controller {
   @state() private _food = 1500;
   @state() private _foodBreakdown: FoodBreakdown | null = null;
   @state() private _rebellionMeter = 0;
+  @state() private _inFiscalDeficit = false;
   @state() private _civilianCap = 0;
   @state() private _science = 0;
   @state() private _scienceRate = 0;
@@ -576,6 +577,7 @@ export class NationalDashboard extends LitElement implements Controller {
     const civ = myPlayer.civilianPopulation();
     const food = myPlayer.food();
     const foodEnabled = !this.game.config().disableFood();
+    const mods = myPlayer.pathModifiers();
     const foodBreakdown = foodEnabled
       ? computeFoodBreakdown(
           myPlayer,
@@ -585,6 +587,7 @@ export class NationalDashboard extends LitElement implements Controller {
           undefined,
           undefined,
           myPlayer.netTradeFoodPerSec(),
+          mods.foodProductionPercent,
         )
       : null;
     const foodStabDelta = foodBreakdown
@@ -597,6 +600,7 @@ export class NationalDashboard extends LitElement implements Controller {
     const sci = myPlayer.science();
     const stab = myPlayer.stability();
     const reb = myPlayer.rebellionMeter();
+    const deficit = myPlayer.inFiscalDeficit();
     const tax = myPlayer.taxRate();
     const progress = myPlayer.pathProgress();
     const gold = myPlayer.gold();
@@ -606,7 +610,6 @@ export class NationalDashboard extends LitElement implements Controller {
     const selectedAugs = myPlayer.selectedAugments();
     const ghost = this.uiState?.ghostStructure ?? null;
     const alliesCount = myPlayer.alliances().length;
-    const mods = myPlayer.pathModifiers();
     const sciRate = sciencePerSecond(myPlayer, civ, stab, mods);
     const breakdown = computeStabilityBreakdown(
       myPlayer,
@@ -615,6 +618,9 @@ export class NationalDashboard extends LitElement implements Controller {
       myPlayer.incomingAttacks().length,
       mods,
       foodStabDelta,
+      myPlayer.outgoingPlayerWarsCount(),
+      myPlayer.unintegratedTiles(),
+      deficit,
     );
 
     if (
@@ -626,6 +632,7 @@ export class NationalDashboard extends LitElement implements Controller {
       sciRate !== this._scienceRate ||
       stab !== this._stability ||
       reb !== this._rebellionMeter ||
+      deficit !== this._inFiscalDeficit ||
       tax !== this._taxRate ||
       gold !== this._gold ||
       nowTick !== this._currentTick ||
@@ -649,6 +656,7 @@ export class NationalDashboard extends LitElement implements Controller {
       this._scienceRate = sciRate;
       this._stability = stab;
       this._rebellionMeter = reb;
+      this._inFiscalDeficit = deficit;
       this._taxRate = tax;
       this._gold = gold;
       this._currentTick = nowTick;
@@ -1094,6 +1102,10 @@ export class NationalDashboard extends LitElement implements Controller {
     const rowColor = (n: number) =>
       n > 0 ? "text-emerald-400" : n < 0 ? "text-rose-400" : "text-slate-400";
 
+    const myPlayer = this.game?.myPlayer() ?? null;
+    const ownedTiles = myPlayer?.numTilesOwned() ?? 0;
+    const unintegrated = myPlayer?.unintegratedTiles() ?? 0;
+
     const rows: Array<[string, number]> = [
       [translateText("crownfall.factor_base"), b.base],
       [translateText("crownfall.factor_tax"), b.tax],
@@ -1106,6 +1118,11 @@ export class NationalDashboard extends LitElement implements Controller {
           >)),
       [translateText("crownfall.factor_war"), b.warStrain],
       [translateText("crownfall.factor_expansion"), b.overexpansion],
+      ...(b.fiscalDeficit !== 0
+        ? ([[translateText("crownfall.factor_fiscal"), b.fiscalDeficit]] as Array<
+            [string, number]
+          >)
+        : []),
       [translateText("crownfall.factor_development"), b.development],
     ];
 
@@ -1136,6 +1153,21 @@ export class NationalDashboard extends LitElement implements Controller {
               </div>
             `,
           )}
+          <div
+            class="flex items-center justify-between border-t border-white/10 pt-1.5 text-[11px] text-[#9aa3b2]"
+          >
+            <span>Admin Capacity</span>
+            <span
+              class="font-mono ${ownedTiles > b.adminCapacity
+                ? "text-amber-300 font-semibold"
+                : "text-slate-300"}"
+            >
+              ${renderNumber(ownedTiles)} / ${renderNumber(b.adminCapacity)}
+              ${unintegrated > 0
+                ? `(${renderNumber(unintegrated)} new)`
+                : ""}
+            </span>
+          </div>
         </div>
       </div>
     `;
@@ -2871,6 +2903,15 @@ export class NationalDashboard extends LitElement implements Controller {
               </span>
               <span class="font-bold ${trendColor}">${trend}</span>
             </button>
+
+            ${this._inFiscalDeficit
+              ? html`<div
+                  class="flex items-center gap-1 rounded-md border border-amber-500/60 bg-amber-950/70 px-2 py-0.5 text-[10.5px] font-bold text-amber-200 animate-pulse"
+                  title="${translateText("crownfall.fiscal_deficit_warning")}"
+                >
+                  <span>DEFICIT</span>
+                </div>`
+              : nothing}
 
             ${this._rebellionMeter > 0
               ? html`<div

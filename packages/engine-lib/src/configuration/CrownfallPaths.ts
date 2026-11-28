@@ -63,6 +63,14 @@ export interface CrownfallPathModifiers {
   incomingNukeSlowPercent: number;
   /** Multiplier (%) on outgoing nuke blast radius (100 = 1.0x; higher = precision warhead yield). */
   nukeBlastRadiusPercent: number;
+  /** Multiplier (%) on national administrative tile capacity (100 = 1.0x; higher governs larger empires). */
+  adminCapacityPercent: number;
+  /** Multiplier (%) on automatic newly conquered territory integration speed (100 = 1.0x). */
+  integrationSpeedPercent: number;
+  /** Multiplier (%) on standing army & active campaign Gold upkeep (100 = 1.0x; lower = cheaper logistics). */
+  militaryUpkeepPercent: number;
+  /** Multiplier (%) on domestic food production (100 = 1.0x). */
+  foodProductionPercent: number;
 }
 
 export const NEUTRAL_PATH_MODIFIERS: CrownfallPathModifiers = {
@@ -84,6 +92,10 @@ export const NEUTRAL_PATH_MODIFIERS: CrownfallPathModifiers = {
   nukeSpeedPercent: 100,
   incomingNukeSlowPercent: 100,
   nukeBlastRadiusPercent: 100,
+  adminCapacityPercent: 100,
+  integrationSpeedPercent: 100,
+  militaryUpkeepPercent: 100,
+  foodProductionPercent: 100,
 };
 
 export const DEV_PATH_TIERS: Record<
@@ -336,13 +348,18 @@ export function computeCrownfallPathModifiers(
   let nukeSpeedPercent = 100;
   let incomingNukeSlowPercent = 100;
   let nukeBlastRadiusPercent = 100;
+  let adminCapacityPercent = 100;
+  let integrationSpeedPercent = 100;
+  let militaryUpkeepPercent = 100;
+  let foodProductionPercent = 100;
 
-  // --- Military Path: Blitzkrieg, Army Capacity & Arsenal Discounts ---
+  // --- Military Path: Blitzkrieg, Army Logistics, Capacity & Arsenal Discounts ---
   const mil = progress.militaryLevel;
   if (mil >= 1) {
     troopRegenPercent += 22;
     maxTroopsPercent += 15;
     attackSpeedPercent += 12;
+    militaryUpkeepPercent -= 15;
     stabilityTargetDelta -= 6;
     scienceRatePercent -= 8;
   }
@@ -352,6 +369,7 @@ export function computeCrownfallPathModifiers(
     attackerLossPercent -= 18;
     attackSpeedPercent += 12; // total +24%
     structureCostPercent -= 12;
+    militaryUpkeepPercent -= 10; // total -25%
     stabilityTargetDelta -= 4; // total -10
     civilianTaxPercent -= 8;
     overexpansionStrainPercent += 15;
@@ -362,6 +380,7 @@ export function computeCrownfallPathModifiers(
     siloCooldownPercent -= 20;
     nukeSpeedPercent += 22;
     structureCostPercent -= 8; // total -20%
+    militaryUpkeepPercent -= 10; // total -35%
     stabilityTargetDelta -= 5; // total -15
     scienceRatePercent -= 6; // total -14%
     civilianTaxPercent -= 6; // total -14%
@@ -374,17 +393,21 @@ export function computeCrownfallPathModifiers(
     siloCooldownPercent -= 15; // total -35%
     nukeSpeedPercent += 15; // total +37%
     structureCostPercent -= 5; // total -25%
+    militaryUpkeepPercent -= 10; // total -45%
     stabilityTargetDelta -= 5; // total -20
     overexpansionStrainPercent += 15; // total +30%
     civilianTaxPercent -= 4; // total -18%
     scienceRatePercent -= 6; // total -20%
   }
 
-  // --- Political Path: Imperial Treasury, Trade Wealth, Civic Discounts & Hegemony ---
+  // --- Political Path: Imperial Administration, Integration, Treasury & Hegemony ---
   const pol = progress.politicalLevel;
   if (pol >= 1) {
     stabilityTargetDelta += 14;
     overexpansionStrainPercent -= 30;
+    adminCapacityPercent += 35;
+    integrationSpeedPercent += 40;
+    foodProductionPercent += 10;
     civilianTaxPercent += 30;
     tradeIncomePercent += 25;
     attackSpeedPercent -= 5;
@@ -393,6 +416,9 @@ export function computeCrownfallPathModifiers(
     civilianTaxPercent += 30; // total +60%
     tradeIncomePercent += 25; // total +50%
     civilianGrowthPercent += 30;
+    adminCapacityPercent += 35; // total +70%
+    integrationSpeedPercent += 40; // total +80%
+    foodProductionPercent += 10; // total +20%
     defenderSlowPercent -= 20;
     structureCostPercent -= 15;
     attackSpeedPercent -= 3; // total -8%
@@ -401,6 +427,8 @@ export function computeCrownfallPathModifiers(
   if (pol >= 3) {
     stabilityTargetDelta += 10; // total +24
     overexpansionStrainPercent -= 25; // total -55%
+    adminCapacityPercent += 40; // total +110%
+    integrationSpeedPercent += 40; // total +120%
     defenderSlowPercent -= 15; // total -35%
     maxTroopsPercent += 20;
     troopRegenPercent += 20;
@@ -411,6 +439,8 @@ export function computeCrownfallPathModifiers(
   if (pol >= 4) {
     stabilityTargetDelta += 12; // total +36
     overexpansionStrainPercent -= 25; // total -80%
+    adminCapacityPercent += 50; // total +160%
+    integrationSpeedPercent += 50; // total +170%
     civilianTaxPercent += 40; // total +100%
     tradeIncomePercent += 35; // total +85%
     civilianGrowthPercent += 25; // total +55%
@@ -421,10 +451,11 @@ export function computeCrownfallPathModifiers(
     scienceRatePercent -= 2; // total -10%
   }
 
-  // --- Scientific Path: Hyper-Tech, R&D Discounts, Precision Warfare & Sky Dominance ---
+  // --- Scientific Path: Agritech, Logistics Efficiency, R&D & Precision Warfare ---
   const sci = progress.scientificLevel;
   if (sci >= 1) {
     scienceRatePercent += 50;
+    foodProductionPercent += 15;
     defenderSlowPercent -= 12;
     structureCostPercent -= 10;
     troopRegenPercent -= 5;
@@ -434,6 +465,8 @@ export function computeCrownfallPathModifiers(
     samRangePercent += 35;
     samCooldownPercent -= 30;
     attackerLossPercent -= 15;
+    adminCapacityPercent += 15;
+    militaryUpkeepPercent -= 10;
     structureCostPercent -= 6; // total -16%
     tradeIncomePercent += 15;
     troopRegenPercent -= 2; // total -7%
@@ -441,6 +474,8 @@ export function computeCrownfallPathModifiers(
   }
   if (sci >= 3) {
     scienceRatePercent += 50; // total +100%
+    foodProductionPercent += 15; // total +30%
+    integrationSpeedPercent += 25;
     defenderSlowPercent -= 15; // total -27%
     nukeBlastRadiusPercent += 18;
     siloCooldownPercent -= 15;
@@ -452,6 +487,9 @@ export function computeCrownfallPathModifiers(
   }
   if (sci >= 4) {
     scienceRatePercent += 60; // total +160%
+    adminCapacityPercent += 20; // total +35%
+    militaryUpkeepPercent -= 10; // total -20%
+    integrationSpeedPercent += 25; // total +50%
     samRangePercent += 35; // total +70%
     samCooldownPercent -= 25; // total -55%
     incomingNukeSlowPercent -= 35;
@@ -485,5 +523,9 @@ export function computeCrownfallPathModifiers(
     nukeSpeedPercent: Math.max(50, nukeSpeedPercent),
     incomingNukeSlowPercent: Math.max(35, incomingNukeSlowPercent),
     nukeBlastRadiusPercent: Math.max(80, nukeBlastRadiusPercent),
+    adminCapacityPercent: Math.max(60, adminCapacityPercent),
+    integrationSpeedPercent: Math.max(60, integrationSpeedPercent),
+    militaryUpkeepPercent: Math.max(45, militaryUpkeepPercent),
+    foodProductionPercent: Math.max(60, foodProductionPercent),
   };
 }

@@ -418,6 +418,7 @@ export function applyAugmentModifiers(
   }
 
   return {
+    ...base,
     troopRegenPercent: Math.max(40, troopRegenPercent),
     maxTroopsPercent: Math.max(60, maxTroopsPercent),
     attackerLossPercent: Math.max(40, attackerLossPercent),

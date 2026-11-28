@@ -371,6 +371,8 @@ export interface PlayerUpdate {
   science?: number;
   stability?: number;
   rebellionMeter?: number;
+  unintegratedTiles?: number;
+  inFiscalDeficit?: boolean;
   activeProject?: NationalProject | null;
   activeProjectExpiresTick?: number;
   projectCooldownUntilTick?: number;

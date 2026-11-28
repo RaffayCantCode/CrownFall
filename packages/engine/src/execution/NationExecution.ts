@@ -1,15 +1,21 @@
 import { TileRef } from "@openfront/engine-api/game/GameMap";
 import {
+  DevelopmentPath,
   Difficulty,
   GameMode,
   Nation,
   PlayerID,
   PlayerType,
   Relation,
+  TaxRate,
   TerrainType,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
 import { GameID } from "@openfront/engine-api/Schemas";
+import {
+  nextTierGoldCost,
+  nextTierScienceCost,
+} from "@openfront/engine-lib/configuration/CrownfallPaths";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
   VersionedSchema,
@@ -240,6 +246,9 @@ export class NationExecution implements Execution {
       this.allianceBehavior.handleAllianceActionRequests(ticks);
       this.allianceBehavior.handleTradeRequests(ticks);
     }
+    if (ticks % 20 === 0) {
+      this.handleNationalGovernance();
+    }
 
     if (ticks % this.attackRate !== this.attackTick) {
       // Call handleStructures twice between regular attack ticks (at 1/3 and 2/3 of the interval)
@@ -322,6 +331,72 @@ export class NationExecution implements Execution {
       this.player,
     );
     this.behaviorsInitialized = true;
+  }
+
+  /**
+   * Deterministic sovereign governance for AI Nations: selects a Development Path,
+   * unlocks affordable tiers, and adjusts Tax Policy in response to stability and fiscal pressure.
+   */
+  private handleNationalGovernance(): void {
+    const player = this.player;
+    if (player === null || !player.isAlive()) return;
+    const config = this.mg.config();
+
+    // 1. Tax Policy management
+    const stab = player.stability();
+    const reb = player.rebellionMeter();
+    const currentTax = player.taxRate();
+    const gold = player.gold();
+    if (stab < 46 || reb >= 25) {
+      if (currentTax !== TaxRate.Low) {
+        player.setTaxRate(TaxRate.Low);
+      }
+    } else if (player.inFiscalDeficit() || (stab >= 74 && gold < 180_000n)) {
+      if (currentTax !== TaxRate.High) {
+        player.setTaxRate(TaxRate.High);
+      }
+    } else if (
+      (currentTax === TaxRate.High && (stab < 60 || gold > 500_000n)) ||
+      (currentTax === TaxRate.Low && stab >= 66)
+    ) {
+      player.setTaxRate(TaxRate.Normal);
+    }
+
+    // 2. Development Path progression
+    if (!config.disablePaths()) {
+      if (player.primaryPath() === null) {
+        const paths = [
+          DevelopmentPath.Military,
+          DevelopmentPath.Political,
+          DevelopmentPath.Scientific,
+        ] as const;
+        player.setPrimaryPath(paths[simpleHash(player.id()) % paths.length]);
+      }
+      const primary = player.primaryPath();
+      if (primary !== null) {
+        const candidatePaths: DevelopmentPath[] = [
+          primary,
+          DevelopmentPath.Political,
+          DevelopmentPath.Military,
+          DevelopmentPath.Scientific,
+        ];
+        for (const p of candidatePaths) {
+          const progress = player.pathProgress();
+          const sciCost = nextTierScienceCost(progress, p);
+          const goldCost = nextTierGoldCost(progress, p);
+          if (
+            sciCost !== null &&
+            goldCost !== null &&
+            player.science() >= sciCost &&
+            player.gold() >= (goldCost * 125n) / 100n
+          ) {
+            // Avoid unlocking Military tiers if already in stability crisis
+            if (p === DevelopmentPath.Military && stab < 48) continue;
+            if (player.unlockDevTier(p)) break;
+          }
+        }
+      }
+    }
   }
 
   private randomSpawnLand(): TileRef | null {

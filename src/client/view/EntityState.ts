@@ -190,6 +190,8 @@ export function playerStateFromUpdate(pu: PlayerUpdate): PlayerState {
     science: pu.science,
     stability: pu.stability,
     rebellionMeter: pu.rebellionMeter,
+    unintegratedTiles: pu.unintegratedTiles,
+    inFiscalDeficit: pu.inFiscalDeficit,
     taxRate: pu.taxRate,
     primaryPath: pu.primaryPath,
     militaryLevel: pu.militaryLevel,

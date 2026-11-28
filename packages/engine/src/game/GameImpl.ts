@@ -2241,6 +2241,9 @@ export class GameImpl implements Game {
       previousOwner._tileChangeVersion++;
       previousOwner._tiles.delete(tile);
       previousOwner._borderTiles.delete(tile);
+      if (previousOwner._unintegratedTiles > previousOwner._tiles.size) {
+        previousOwner._unintegratedTiles = previousOwner._tiles.size;
+      }
       if (
         this._activeBountyTargetID !== null &&
         previousOwner.id() === this._activeBountyTargetID &&
@@ -2257,6 +2260,17 @@ export class GameImpl implements Game {
     this._territoryVersion++;
     this._map.setOwnerID(tile, owner.smallID());
     owner._tiles.add(tile);
+    if (
+      !this.inSpawnPhase() &&
+      !this._config.gameConfig().tutorial &&
+      owner.type() !== PlayerType.Bot &&
+      previousOwner !== owner &&
+      (previousOwner.isPlayer()
+        ? this._activeGameplayTicks > 0
+        : this._activeGameplayTicks > 50)
+    ) {
+      owner.addUnintegratedTiles(1);
+    }
     owner._lastTileChange = this._ticks;
     owner._tileChangeVersion++;
     this.updateBorders(tile);
@@ -2277,6 +2291,9 @@ export class GameImpl implements Game {
     previousOwner._tileChangeVersion++;
     previousOwner._tiles.delete(tile);
     previousOwner._borderTiles.delete(tile);
+    if (previousOwner._unintegratedTiles > previousOwner._tiles.size) {
+      previousOwner._unintegratedTiles = previousOwner._tiles.size;
+    }
 
     this._territoryVersion++;
     this._map.setOwnerID(tile, 0);

@@ -438,6 +438,13 @@ export interface Player extends PlayerLike {
   setRebellionMeter(meter: number): void;
   rebellionCooldownTicks(): number;
   setRebellionCooldownTicks(ticks: number): void;
+  unintegratedTiles(): number;
+  setUnintegratedTiles(tiles: number): void;
+  addUnintegratedTiles(delta: number): void;
+  inFiscalDeficit(): boolean;
+  setFiscalDeficit(deficit: boolean): void;
+  expansionWarningBand(): number;
+  setExpansionWarningBand(band: number): void;
   activeProject(): NationalProject | null;
   activeProjectExpiresTick(): number;
   projectCooldownUntilTick(): number;

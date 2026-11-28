@@ -188,6 +188,9 @@ export class PlayerImpl implements Player {
   private _stability: number = CROWNFALL_CONFIG.startingStability;
   private _rebellionMeter: number = 0;
   private _rebellionCooldownTicks: number = 0;
+  public _unintegratedTiles: number = 0;
+  private _inFiscalDeficit: boolean = false;
+  private _expansionWarningBand: number = 0;
   private _activeProject: NationalProject | null = null;
   private _activeProjectExpiresTick: number = 0;
   private _projectCooldownUntilTick: number = 0;
@@ -481,6 +484,8 @@ export class PlayerImpl implements Player {
       science: this._science,
       stability: this._stability,
       rebellionMeter: this._rebellionMeter,
+      unintegratedTiles: this._unintegratedTiles,
+      inFiscalDeficit: this._inFiscalDeficit,
       activeProject: this._activeProject,
       activeProjectExpiresTick: this._activeProjectExpiresTick,
       projectCooldownUntilTick: this._projectCooldownUntilTick,
@@ -2061,6 +2066,37 @@ export class PlayerImpl implements Player {
     this._rebellionCooldownTicks = Math.max(0, Math.trunc(ticks));
   }
 
+  unintegratedTiles(): number {
+    return this._unintegratedTiles;
+  }
+
+  setUnintegratedTiles(tiles: number): void {
+    this._unintegratedTiles = Math.max(
+      0,
+      Math.min(this.numTilesOwned(), Math.trunc(tiles)),
+    );
+  }
+
+  addUnintegratedTiles(delta: number): void {
+    this.setUnintegratedTiles(this._unintegratedTiles + Math.trunc(delta));
+  }
+
+  inFiscalDeficit(): boolean {
+    return this._inFiscalDeficit;
+  }
+
+  setFiscalDeficit(deficit: boolean): void {
+    this._inFiscalDeficit = deficit;
+  }
+
+  expansionWarningBand(): number {
+    return this._expansionWarningBand;
+  }
+
+  setExpansionWarningBand(band: number): void {
+    this._expansionWarningBand = Math.max(0, Math.trunc(band));
+  }
+
   activeProject(): NationalProject | null {
     if (
       this._activeProject !== null &&
@@ -2343,6 +2379,8 @@ export class PlayerImpl implements Player {
           this._stability * 7 +
           this._rebellionMeter * 13 +
           this._rebellionCooldownTicks * 3 +
+          this._unintegratedTiles * 17 +
+          (this._inFiscalDeficit ? 29 : 0) +
           (this._activeProject ? simpleHash(this._activeProject) : 0) +
           this._activeProjectExpiresTick * 5 +
           this._projectCooldownUntilTick * 11 +
@@ -2551,6 +2589,9 @@ export class PlayerImpl implements Player {
           : this._pendingAugmentChoices.slice(),
       rebellionMeter: this._rebellionMeter,
       rebellionCooldownTicks: this._rebellionCooldownTicks,
+      unintegratedTiles: this._unintegratedTiles,
+      inFiscalDeficit: this._inFiscalDeficit,
+      expansionWarningBand: this._expansionWarningBand,
       activeProject: this._activeProject,
       activeProjectExpiresTick: this._activeProjectExpiresTick,
       projectCooldownUntilTick: this._projectCooldownUntilTick,
@@ -2643,6 +2684,9 @@ export class PlayerImpl implements Player {
     this._pendingAugmentChoices = s.pendingAugmentChoices.slice();
     this._rebellionMeter = s.rebellionMeter;
     this._rebellionCooldownTicks = s.rebellionCooldownTicks;
+    this._unintegratedTiles = s.unintegratedTiles;
+    this._inFiscalDeficit = s.inFiscalDeficit;
+    this._expansionWarningBand = s.expansionWarningBand;
     this._activeProject = s.activeProject;
     this._activeProjectExpiresTick = s.activeProjectExpiresTick;
     this._projectCooldownUntilTick = s.projectCooldownUntilTick;
@@ -2654,7 +2698,7 @@ export class PlayerImpl implements Player {
 
 export const PlayerSnapshot = snapshotType({
   name: "Player",
-  version: 8,
+  version: 9,
   migrations: {
     1: (d: Record<string, unknown>) => ({
       ...d,
@@ -2695,6 +2739,12 @@ export const PlayerSnapshot = snapshotType({
       ...d,
       activeBountyBuff: null,
       bountyBuffExpiresTick: 0,
+    }),
+    8: (d: Record<string, unknown>) => ({
+      ...d,
+      unintegratedTiles: 0,
+      inFiscalDeficit: false,
+      expansionWarningBand: 0,
     }),
   },
   schema: z.object({
@@ -2774,6 +2824,9 @@ export const PlayerSnapshot = snapshotType({
     pendingAugmentChoices: z.array(z.enum(AugmentId)),
     rebellionMeter: zInt(),
     rebellionCooldownTicks: zInt(),
+    unintegratedTiles: zInt(),
+    inFiscalDeficit: z.boolean(),
+    expansionWarningBand: zInt(),
     activeProject: z.enum(NationalProject).nullable(),
     activeProjectExpiresTick: zInt(),
     projectCooldownUntilTick: zInt(),

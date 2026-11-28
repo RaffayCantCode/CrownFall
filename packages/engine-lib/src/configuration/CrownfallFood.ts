@@ -23,9 +23,9 @@ export const CROWNFALL_FOOD_CONFIG = {
   startingFood: 1_500,
   baseFoodCap: 6_000,
   granaryCapPerLevel: 8_000,
-  baseHomelandFoodPerSec: 8, // 480 / min baseline so newly spawned nations aren't starved
-  arableLandExponent: 0.55,
-  arableLandDivisor: 3,
+  baseHomelandFoodPerSec: 5, // 300 / min baseline supports early homeland (~15k-18k pop), then requires Farms/Trade
+  arableLandExponent: 0.5,
+  arableLandDivisor: 6, // Unimproved conquered land gives modest foraging, never replacing Farms
   farmFoodPerSecPerLevel: 18, // +1,080 / min per Farm level
   bakeryFlatFoodPerSecPerLevel: 6, // +360 / min per Bakery level
   bakeryEfficiencyPercentPerLevel: 15, // +15% food efficiency per Bakery level
@@ -33,13 +33,13 @@ export const CROWNFALL_FOOD_CONFIG = {
   bakeryPopCapPerLevel: 80_000,
   bakeryStabilityPerLevel: 3,
   bakeryStabilityMax: 15,
-  civiliansPerFoodPerSec: 4_000, // 15 food/min per 1,000 civilians
+  civiliansPerFoodPerSec: 3_000, // 20 food/min per 1,000 civilians
   shortageWarningThresholdPercent: 20,
-  acuteShortageStabilityPenalty: -6,
-  famineStabilityPenalty: -18,
+  acuteShortageStabilityPenalty: -8,
+  famineStabilityPenalty: -20,
   abundantSurplusStabilityBonus: 4,
-  faminePopDeclineDivisor: 100,
-  famineMinPopDeclinePerSec: 80,
+  faminePopDeclineDivisor: 90,
+  famineMinPopDeclinePerSec: 100,
 } as const;
 
 export function maxFoodStorage(granaryLevels: number = 0): number {
@@ -53,6 +53,7 @@ export function foodProductionPerSecond(
   player: PlayerLike,
   farmLevels: number = 0,
   bakeryLevels: number = 0,
+  foodProductionPercent: number = 100,
 ): number {
   const tiles = Math.max(0, player.numTilesOwned());
   const arable = Math.floor(
@@ -70,7 +71,10 @@ export function foodProductionPerSecond(
     Math.max(0, bakeryLevels) *
       CROWNFALL_FOOD_CONFIG.bakeryEfficiencyPercentPerLevel,
   );
-  return Math.max(0, Math.floor((raw * (100 + effBonus)) / 100));
+  return Math.max(
+    0,
+    Math.floor((raw * (100 + effBonus) * foodProductionPercent) / 10_000),
+  );
 }
 
 export function foodConsumptionPerSecond(civilianPop: number): number {
@@ -112,12 +116,14 @@ export function computeFoodBreakdown(
   bakeryLevels: number = completedStructureLevels(player, UnitType.Bakery),
   granaryLevels: number = completedStructureLevels(player, UnitType.Granary),
   tradeNetPerSec: number = 0,
+  foodProductionPercent: number = 100,
 ): FoodBreakdown {
   const maxStorage = maxFoodStorage(granaryLevels);
   const productionPerSec = foodProductionPerSecond(
     player,
     farmLevels,
     bakeryLevels,
+    foodProductionPercent,
   );
   const consumptionPerSec = foodConsumptionPerSecond(civilianPop);
   const netPerSec = productionPerSec + tradeNetPerSec - consumptionPerSec;

@@ -1,4 +1,4 @@
-import { Tick, UnitType } from "@openfront/engine-api/game/GameTypes";
+import { Gold, Tick, UnitType } from "@openfront/engine-api/game/GameTypes";
 import { NukeMagnitude } from "@openfront/engine-lib/configuration/Config";
 import {
   AttackLogicInput,
@@ -76,6 +76,10 @@ export class TestConfig extends EngineConfig {
 
   override enableOpeningPathDraft(): boolean {
     return false;
+  }
+
+  override defaultStartingTreasury(): Gold {
+    return 0n;
   }
 }
 export class UseRealAttackLogic extends TestConfig {

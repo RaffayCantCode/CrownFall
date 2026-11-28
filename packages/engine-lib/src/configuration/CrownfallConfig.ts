@@ -26,8 +26,11 @@ export const CROWNFALL_CONFIG = {
   maxStability: 100,
   /** Stability drifts toward its target by at most this much per second. */
   stabilityStepPerSecond: 1,
-  /** AI players stay above this floor in Phase 1 so existing AI behavior is undisturbed. */
-  aiStabilityFloor: 50,
+  /** Wilderness/Rebel bots (PlayerType.Bot) stay above this floor; AI Nations follow human rules. */
+  botStabilityFloor: 50,
+
+  /** Default starting National Establishment treasury when lobby startingGold is unset. */
+  defaultStartingTreasury: 115_000n,
 
   startingCivilianPop: 10_000,
   baseCivilianPopCap: 50_000,
@@ -45,6 +48,24 @@ export const CROWNFALL_CONFIG = {
   /** Passive science per second from every 25k civilian population. */
   civilianScienceDivisor: 25_000,
 
+  /** Administrative Capacity & Expansion Pressure tunables. */
+  baseAdminTiles: 450,
+  cityAdminTilesPerLevel: 450,
+  publicServicesAdminTilesPerLevel: 650,
+  powerPlantAdminTilesPerLevel: 300,
+  overexpansionStructuralMax: 22,
+  overexpansionVelocityMax: 12,
+  overexpansionStrainMax: -32,
+
+  /** Military Upkeep & Campaign Finance tunables. */
+  baseFreeGarrisonTroops: 95_000,
+  tileMilitiaFreeScale: 1_650,
+  cityFreeGarrisonPerLevel: 220_000,
+  standingUpkeepPerThousandTroops: 4,
+  campaignUpkeepPerThousandPlayerTroops: 22,
+  campaignUpkeepPerThousandWildernessTroops: 2,
+  fiscalDeficitStabilityPenalty: -10,
+
   /** Stability target contributors. */
   baseStabilityTarget: 62,
   publicServicesStabilityPerLevel: 7,
@@ -52,10 +73,8 @@ export const CROWNFALL_CONFIG = {
   housingSurplusBonus: 5,
   housingOvercrowdedPenalty: -8,
   activeWarStrainPerAttack: -6,
+  activeOffensiveWarStrainPerAttack: -4,
   activeWarStrainMax: -24,
-  overexpansionFreeTiles: 6_000,
-  overexpansionTilesPerPoint: 8_000,
-  overexpansionStrainMax: -28,
 
   /** Tax rate modifiers (percentages as integers for deterministic math). */
   tax: {
@@ -71,7 +90,7 @@ export const CROWNFALL_CONFIG = {
     },
     [TaxRate.High]: {
       incomePercent: 165,
-      stabilityDelta: -26,
+      stabilityDelta: -20,
       growthPercent: 70,
     },
   },
@@ -98,7 +117,9 @@ export interface StabilityBreakdown {
   food: number;
   warStrain: number;
   overexpansion: number;
+  fiscalDeficit: number;
   development: number;
+  adminCapacity: number;
   target: number;
 }
 
@@ -138,6 +159,114 @@ export function maxCivilianPopulation(player: PlayerLike): number {
   );
 }
 
+export function computeAdministrativeCapacity(
+  player: PlayerLike,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
+): number {
+  const cityLevels = completedStructureLevels(player, UnitType.City);
+  const publicLevels = completedStructureLevels(
+    player,
+    UnitType.PublicServices,
+  );
+  const powerLevels = completedStructureLevels(player, UnitType.Housing);
+  const raw =
+    CROWNFALL_CONFIG.baseAdminTiles +
+    cityLevels * CROWNFALL_CONFIG.cityAdminTilesPerLevel +
+    publicLevels * CROWNFALL_CONFIG.publicServicesAdminTilesPerLevel +
+    powerLevels * CROWNFALL_CONFIG.powerPlantAdminTilesPerLevel;
+  const adminPct = mods.adminCapacityPercent ?? 100;
+  return Math.max(200, Math.floor((raw * adminPct) / 100));
+}
+
+export function computeTerritoryIntegrationPerSecond(
+  adminCapacity: number,
+  stability: number,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
+): number {
+  const baseRate = 10 + Math.floor(Math.max(0, adminCapacity) / 45);
+  const stabMult =
+    stability >= 60 ? 100 : 50 + Math.floor((Math.max(0, stability) * 50) / 60);
+  const speedPct = mods.integrationSpeedPercent ?? 100;
+  return Math.max(5, Math.floor((baseRate * stabMult * speedPct) / 10_000));
+}
+
+export function computeExpansionPressure(
+  ownedTiles: number,
+  unintegratedTiles: number,
+  adminCapacity: number,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
+): number {
+  const safeCap = Math.max(200, adminCapacity);
+  const excessTiles = Math.max(0, ownedTiles - safeCap);
+  const structuralStep = Math.max(110, Math.floor(safeCap / 4));
+  const structuralStrain = Math.min(
+    CROWNFALL_CONFIG.overexpansionStructuralMax,
+    Math.floor(excessTiles / structuralStep),
+  );
+
+  const clampedUnintegrated = Math.max(
+    0,
+    Math.min(ownedTiles, unintegratedTiles),
+  );
+  const freeUnintegrated = Math.max(60, Math.floor(safeCap / 5));
+  const excessUnintegrated = Math.max(
+    0,
+    clampedUnintegrated - freeUnintegrated,
+  );
+  const velocityStep = Math.max(45, Math.floor(safeCap / 7));
+  const velocityStrain = Math.min(
+    CROWNFALL_CONFIG.overexpansionVelocityMax,
+    Math.floor(excessUnintegrated / velocityStep),
+  );
+
+  const totalRaw = structuralStrain + velocityStrain;
+  if (totalRaw <= 0) return 0;
+  return Math.max(
+    CROWNFALL_CONFIG.overexpansionStrainMax,
+    -Math.floor((totalRaw * mods.overexpansionStrainPercent) / 100),
+  );
+}
+
+export function computeFreeGarrisonTroops(player: PlayerLike): number {
+  const tiles = Math.max(0, player.numTilesOwned());
+  const cityLevels = completedStructureLevels(player, UnitType.City);
+  return (
+    CROWNFALL_CONFIG.baseFreeGarrisonTroops +
+    Math.floor(pow(tiles, 0.6) * CROWNFALL_CONFIG.tileMilitiaFreeScale) +
+    cityLevels * CROWNFALL_CONFIG.cityFreeGarrisonPerLevel
+  );
+}
+
+export function computeMilitaryUpkeepPerSecond(
+  player: PlayerLike,
+  outgoingPlayerAttackTroops: number,
+  outgoingWildernessTroops: number,
+  mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
+  goldMultiplier: number = 1,
+): Gold {
+  if (player.type() === PlayerType.Bot) {
+    return 0n;
+  }
+  const freeGarrison = computeFreeGarrisonTroops(player);
+  const excessStanding = Math.max(0, Math.floor(player.troops()) - freeGarrison);
+  const standingCost = Math.floor(
+    (excessStanding * CROWNFALL_CONFIG.standingUpkeepPerThousandTroops) / 1000,
+  );
+  const campaignCost = Math.floor(
+    (Math.max(0, outgoingPlayerAttackTroops) *
+      CROWNFALL_CONFIG.campaignUpkeepPerThousandPlayerTroops +
+      Math.max(0, outgoingWildernessTroops) *
+        CROWNFALL_CONFIG.campaignUpkeepPerThousandWildernessTroops) /
+      1000,
+  );
+  const rawCost = standingCost + campaignCost;
+  if (rawCost <= 0) return 0n;
+  const upkeepPct = mods.militaryUpkeepPercent ?? 100;
+  return BigInt(
+    Math.max(0, Math.floor(((rawCost * upkeepPct) / 100) * goldMultiplier)),
+  );
+}
+
 export function computeStabilityBreakdown(
   player: PlayerLike,
   taxRate: TaxRate,
@@ -145,6 +274,9 @@ export function computeStabilityBreakdown(
   activeIncomingAttacks: number,
   mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
   foodStabilityDelta: number = 0,
+  activeOffensiveWars: number = 0,
+  unintegratedTilesOverride?: number,
+  inFiscalDeficitOverride?: boolean,
 ): StabilityBreakdown {
   const base = CROWNFALL_CONFIG.baseStabilityTarget;
   const tax = CROWNFALL_CONFIG.tax[taxRate].stabilityDelta;
@@ -172,20 +304,30 @@ export function computeStabilityBreakdown(
 
   const warStrain = Math.max(
     CROWNFALL_CONFIG.activeWarStrainMax,
-    activeIncomingAttacks * CROWNFALL_CONFIG.activeWarStrainPerAttack,
+    activeIncomingAttacks * CROWNFALL_CONFIG.activeWarStrainPerAttack +
+      activeOffensiveWars * CROWNFALL_CONFIG.activeOffensiveWarStrainPerAttack,
   );
 
-  const excessTiles = Math.max(
-    0,
-    player.numTilesOwned() - CROWNFALL_CONFIG.overexpansionFreeTiles,
+  const adminCapacity = computeAdministrativeCapacity(player, mods);
+  const unintegratedTiles =
+    unintegratedTilesOverride ??
+    ((player as { unintegratedTiles?: () => number }).unintegratedTiles?.() ??
+      0);
+  const overexpansion = computeExpansionPressure(
+    player.numTilesOwned(),
+    unintegratedTiles,
+    adminCapacity,
+    mods,
   );
-  const rawOverexpansion = Math.min(
-    -CROWNFALL_CONFIG.overexpansionStrainMax,
-    Math.floor(excessTiles / CROWNFALL_CONFIG.overexpansionTilesPerPoint),
-  );
-  const overexpansion = -Math.floor(
-    (rawOverexpansion * mods.overexpansionStrainPercent) / 100,
-  );
+
+  const inDeficit =
+    inFiscalDeficitOverride ??
+    ((player as { inFiscalDeficit?: () => boolean }).inFiscalDeficit?.() ??
+      false);
+  const fiscalDeficit = inDeficit
+    ? CROWNFALL_CONFIG.fiscalDeficitStabilityPenalty
+    : 0;
+
   const development = mods.stabilityTargetDelta;
   const food = foodStabilityDelta;
 
@@ -197,11 +339,12 @@ export function computeStabilityBreakdown(
     food +
     warStrain +
     overexpansion +
+    fiscalDeficit +
     development;
   const minFloor =
-    player.type() === PlayerType.Human
-      ? CROWNFALL_CONFIG.minStability
-      : CROWNFALL_CONFIG.aiStabilityFloor;
+    player.type() === PlayerType.Bot
+      ? CROWNFALL_CONFIG.botStabilityFloor
+      : CROWNFALL_CONFIG.minStability;
   const target = Math.max(
     minFloor,
     Math.min(CROWNFALL_CONFIG.maxStability, rawTarget),
@@ -215,7 +358,9 @@ export function computeStabilityBreakdown(
     food,
     warStrain,
     overexpansion,
+    fiscalDeficit,
     development,
+    adminCapacity,
     target,
   };
 }
@@ -254,8 +399,8 @@ export function civilianTaxGoldPerSecond(
   if (player.type() === PlayerType.Bot) {
     return 0n;
   }
-  // 15 gold/sec per 1,000 civilians at Normal tax & 100% stability efficiency.
-  const baseGold = Math.floor((civilianPop * 15) / 1000);
+  // 22 gold/sec per 1,000 civilians at Normal tax & 100% stability/integration efficiency.
+  const baseGold = Math.floor((civilianPop * 22) / 1000);
   const taxMult = CROWNFALL_CONFIG.tax[taxRate].incomePercent;
   // Low stability hurts tax collection sharply (100% at >=60, 75% in unrest, 50% in crisis, 25% in rebellion).
   const stabEfficiency =
@@ -266,9 +411,24 @@ export function civilianTaxGoldPerSecond(
         : stability >= 15
           ? 50
           : 25;
+  const ownedTiles = player.numTilesOwned();
+  const unintegrated = Math.max(
+    0,
+    Math.min(
+      ownedTiles,
+      (player as { unintegratedTiles?: () => number }).unintegratedTiles?.() ??
+        0,
+    ),
+  );
+  const integrationEff =
+    ownedTiles > 0 ? 100 - Math.floor((unintegrated * 45) / ownedTiles) : 100;
   const raw = Math.floor(
-    ((baseGold * taxMult * stabEfficiency * mods.civilianTaxPercent) /
-      1_000_000) *
+    ((baseGold *
+      taxMult *
+      stabEfficiency *
+      integrationEff *
+      mods.civilianTaxPercent) /
+      100_000_000) *
       goldMultiplier,
   );
   const powerLevels = completedStructureLevels(player, UnitType.Housing);

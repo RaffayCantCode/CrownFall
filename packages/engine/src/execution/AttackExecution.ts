@@ -9,6 +9,10 @@ import {
   TerraNullius,
   UnitType,
 } from "@openfront/engine-api/game/GameTypes";
+import {
+  crisisAttackerLossPercent,
+  crisisAttackSpeedPercent,
+} from "@openfront/engine-lib/configuration/CrownfallCrises";
 import { renderTroops } from "@openfront/engine-lib/Format";
 import { PseudoRandom } from "@openfront/engine-lib/PseudoRandom";
 import {
@@ -379,6 +383,24 @@ export class AttackExecution implements Execution {
       );
     const attackerMods = this._owner.pathModifiers();
     const defenderMods = defender !== null ? defender.pathModifiers() : null;
+    const stab = this._owner.stability();
+    const deficit = this._owner.inFiscalDeficit();
+    const effectiveLossPct = Math.max(
+      35,
+      Math.floor(
+        (attackerMods.attackerLossPercent *
+          crisisAttackerLossPercent(stab, deficit)) /
+          100,
+      ),
+    );
+    const effectiveSpeedPct = Math.max(
+      40,
+      Math.floor(
+        (attackerMods.attackSpeedPercent *
+          crisisAttackSpeedPercent(stab, deficit)) /
+          100,
+      ),
+    );
     return {
       terrain: this.map.terrainType(tile),
       attackTroops,
@@ -402,8 +424,8 @@ export class AttackExecution implements Execution {
         ? this.mg.numTilesWithFallout() / this.mg.numLandTiles()
         : null,
       borderSize,
-      attackerLossPercent: attackerMods.attackerLossPercent,
-      attackSpeedPercent: attackerMods.attackSpeedPercent,
+      attackerLossPercent: effectiveLossPct,
+      attackSpeedPercent: effectiveSpeedPct,
       defenderSlowPercent: defenderMods?.defenderSlowPercent ?? 100,
     };
   }

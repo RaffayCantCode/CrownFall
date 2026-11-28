@@ -98,6 +98,8 @@ export interface PlayerState {
   science?: number;
   stability?: number;
   rebellionMeter?: number;
+  unintegratedTiles?: number;
+  inFiscalDeficit?: boolean;
   taxRate?: string;
   primaryPath?: string | null;
   militaryLevel?: number;

@@ -62,6 +62,12 @@ export function applyStateUpdate(target: PlayerState, pu: PlayerUpdate): void {
   if (pu.rebellionMeter !== undefined) {
     target.rebellionMeter = pu.rebellionMeter;
   }
+  if (pu.unintegratedTiles !== undefined) {
+    target.unintegratedTiles = pu.unintegratedTiles;
+  }
+  if (pu.inFiscalDeficit !== undefined) {
+    target.inFiscalDeficit = pu.inFiscalDeficit;
+  }
   if (pu.taxRate !== undefined) target.taxRate = pu.taxRate;
   if (pu.primaryPath !== undefined) target.primaryPath = pu.primaryPath;
   if (pu.militaryLevel !== undefined) target.militaryLevel = pu.militaryLevel;

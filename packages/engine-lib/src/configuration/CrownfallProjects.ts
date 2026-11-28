@@ -738,6 +738,7 @@ export function applyActiveProjectModifiers(
   if (activeProject === null) return base;
   const m = NATIONAL_PROJECTS_BY_ID[activeProject].modifiers;
   return {
+    ...base,
     troopRegenPercent: Math.max(
       40,
       base.troopRegenPercent + (m.troopRegenPercent ?? 0),
