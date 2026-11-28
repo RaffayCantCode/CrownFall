@@ -13,9 +13,9 @@ export const CROWNFALL_CRISIS_CONFIG = {
   rebellionTaxPenaltyPercent: 50,
 
   /** Troop regeneration multiplier during Unrest / Crisis / Rebellion (percent). */
-  unrestTroopRegenPercent: 85,
-  crisisTroopRegenPercent: 65,
-  rebellionTroopRegenPercent: 45,
+  unrestTroopRegenPercent: 90,
+  crisisTroopRegenPercent: 72,
+  rebellionTroopRegenPercent: 55,
 
   /** Civilian emigration rate in basis points per second (10_000 = 100%). */
   unrestEmigrationBps: 35, // 0.35%/sec
@@ -65,7 +65,7 @@ export function crisisTroopRegenPercent(
     pct = CROWNFALL_CRISIS_CONFIG.unrestTroopRegenPercent;
   }
   if (inFiscalDeficit) {
-    pct = Math.max(25, Math.floor((pct * 70) / 100));
+    pct = Math.max(35, Math.floor((pct * 75) / 100));
   }
   return pct;
 }
@@ -79,37 +79,39 @@ export function crisisAttackerLossPercent(
   inFiscalDeficit: boolean = false,
 ): number {
   const band: StabilityBand = stabilityBand(stability);
-  let pct = stability >= 80 ? 95 : 100;
+  let pct = stability >= 78 ? 88 : 100;
   if (band === "unrest") {
-    pct = 110;
+    pct = 104;
   } else if (band === "crisis") {
-    pct = 122;
+    pct = 115;
   } else if (band === "rebellion") {
-    pct = 135;
+    pct = 128;
   }
   if (inFiscalDeficit) {
-    pct += 15;
+    pct = Math.max(116, pct + 16);
   }
   return pct;
 }
 
 /**
- * Returns the offensive push-speed multiplier (percent; <100 = slower campaign push)
- * driven by severe instability or unpaid supply lines.
+ * Returns the offensive push-speed multiplier (percent; >100 = faster conquest, <100 = slower campaign push)
+ * driven by national morale, stability, and military supply lines.
  */
 export function crisisAttackSpeedPercent(
   stability: number,
   inFiscalDeficit: boolean = false,
 ): number {
   const band: StabilityBand = stabilityBand(stability);
-  let pct = 100;
-  if (band === "crisis") {
-    pct = 88;
+  let pct = stability >= 78 ? 115 : 104;
+  if (band === "unrest") {
+    pct = 100;
+  } else if (band === "crisis") {
+    pct = 90;
   } else if (band === "rebellion") {
-    pct = 80;
+    pct = 82;
   }
   if (inFiscalDeficit) {
-    pct = Math.max(55, pct - 15);
+    pct = Math.min(84, Math.max(55, pct - 20));
   }
   return pct;
 }

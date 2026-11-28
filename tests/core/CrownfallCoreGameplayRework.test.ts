@@ -469,6 +469,54 @@ describe("CrownFall Core Gameplay Rework: Progression, Expansion Pressure & Scen
     expect(totalFarmsAndCivicAt7m).toBeGreaterThan(0);
     expect(totalPathTiersAt7m).toBeGreaterThan(0);
   });
+
+  test("Conquest Playability: a stable, funded player decisively conquers a neighboring real Nation and earns Victory Spoils without collapsing", async () => {
+    const humanInfo = new PlayerInfo("PlayerRepublic", PlayerType.Human, "c1", "hero");
+    const rivalInfo = new PlayerInfo("RivalKingdom", PlayerType.Nation, null, "rival_nat");
+
+    const game = await setup(
+      "big_plains",
+      {
+        difficulty: Difficulty.Hard,
+        instantBuild: true,
+        disablePaths: true,
+        disableAugments: true,
+      },
+      [humanInfo, rivalInfo],
+      undefined,
+      EngineConfig,
+      false,
+    );
+
+    game.addExecution(
+      new SpawnExecution("rework-conq", humanInfo, game.ref(25, 25)),
+      new SpawnExecution("rework-conq", rivalInfo, game.ref(45, 25)),
+    );
+    executeTicks(game, 105);
+    game.endSpawnPhase();
+    executeTicks(game, 15);
+
+    const hero = game.player("hero");
+    const rival = game.player("rival_nat");
+
+    paintTerritory(game, hero, 15, 34, 15, 34); // 400-tile homeland
+    paintTerritory(game, rival, 35, 50, 15, 34); // 320-tile neighboring nation
+    hero.setTroops(95_000);
+    rival.setTroops(45_000);
+    rival.addCivilianPopulation(30_000);
+    rival.setFood(2_000);
+
+    const popBefore = hero.civilianPopulation();
+    game.addExecution(new AttackExecution(75_000, hero, rival.id(), null));
+    executeTicks(game, 120);
+
+    // Rival nation is decisively conquered and annexed, and player remains Stable & out of Fiscal Deficit
+    expect(rival.isAlive()).toBe(false);
+    expect(hero.numTilesOwned()).toBeGreaterThan(680);
+    expect(hero.inFiscalDeficit()).toBe(false);
+    expect(hero.stability()).toBeGreaterThanOrEqual(60);
+    expect(hero.civilianPopulation()).toBeGreaterThan(popBefore + 8_000);
+  });
 });
 
 function pUpgradeAll(player: Player): void {

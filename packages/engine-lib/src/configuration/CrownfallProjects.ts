@@ -693,40 +693,45 @@ export function rollMatchOperations(
       const earlyPool = ALL_NATIONAL_PROJECTS.filter(
         (p) => p.requiredPath === path && p.requiredTier <= 2,
       );
-      out.push(...pickRandomSubset(rng, earlyPool, 2));
+      out.push(...pickRandomSubset(rng, earlyPool, 1));
     }
     return out;
   }
 
   const chosen: NationalProjectDefinition[] = [];
   const used = new Set<NationalProject>();
-  // Pick 1 random op for each tier T1..T4 of primaryPath so progression is always smooth
-  for (const tier of [1, 2, 3, 4]) {
-    const tierPool = ALL_NATIONAL_PROJECTS.filter(
-      (p) => p.requiredPath === primaryPath && p.requiredTier === tier,
-    );
-    const picked = pickRandomSubset(rng, tierPool, 1);
-    for (const p of picked) {
-      chosen.push(p);
-      used.add(p.id);
-    }
-  }
-  // Plus 2 random wildcard primary ops
-  const remainingPrimary = ALL_NATIONAL_PROJECTS.filter(
-    (p) => p.requiredPath === primaryPath && !used.has(p.id),
+
+  // 1. One random early operation (T1–T2) from primaryPath
+  const earlyPrimary = ALL_NATIONAL_PROJECTS.filter(
+    (p) => p.requiredPath === primaryPath && p.requiredTier <= 2,
   );
-  for (const p of pickRandomSubset(rng, remainingPrimary, 2)) {
+  for (const p of pickRandomSubset(rng, earlyPrimary, 1)) {
     chosen.push(p);
     used.add(p.id);
   }
-  // Plus 2 random cross-path T1–T2 ops (secondary paths cap at T2)
-  const crossPool = ALL_NATIONAL_PROJECTS.filter(
+
+  // 2. One random advanced operation (T3–T4) from primaryPath
+  const latePrimary = ALL_NATIONAL_PROJECTS.filter(
     (p) =>
-      p.requiredPath !== primaryPath &&
-      p.requiredTier <= 2 &&
+      p.requiredPath === primaryPath &&
+      p.requiredTier >= 3 &&
       !used.has(p.id),
   );
-  chosen.push(...pickRandomSubset(rng, crossPool, 2));
+  for (const p of pickRandomSubset(rng, latePrimary, 1)) {
+    chosen.push(p);
+    used.add(p.id);
+  }
+
+  // 3. One random wildcard operation (remaining primaryPath or cross-path T1–T2)
+  const wildcardPool = ALL_NATIONAL_PROJECTS.filter(
+    (p) =>
+      !used.has(p.id) &&
+      (p.requiredPath === primaryPath || p.requiredTier <= 2),
+  );
+  for (const p of pickRandomSubset(rng, wildcardPool, 1)) {
+    chosen.push(p);
+    used.add(p.id);
+  }
 
   return chosen.sort((a, b) => a.requiredTier - b.requiredTier);
 }

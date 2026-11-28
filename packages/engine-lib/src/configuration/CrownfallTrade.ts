@@ -11,9 +11,9 @@ export const CROWNFALL_TRADE_CONFIG = {
   requestDurationTicks: 300, // 30s
   cooldownTicks: 250, // 25s cooldown after reject/cancel
   minAgreementDurationTicks: 150, // 15s minimum before manual cancellation
-  foodShipmentPerSec: 15, // 900 Food/min
+  foodShipmentPerSec: 25, // 1,500 Food/min (supports ~75k civilians)
   minPartnerFoodBufferForExport: 300,
-  foodPaymentGoldPerSec: 1_500n as Gold, // 90K Gold/min
+  foodPaymentGoldPerSec: 2_500n as Gold, // 150K Gold/min paid from importer to exporter
   commerceGoldPerSec: 1_800n as Gold, // 108K Gold/min
   researchSciencePerSec: 6, // 360 SCI/min
   researchGoldPerSec: 800n as Gold,

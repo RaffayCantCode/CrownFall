@@ -190,16 +190,16 @@ export class NationAllianceBehavior {
         return this.random.nextInt(0, 100) < (underHeavyAttack ? 95 : 80);
       }
       case AllianceActionType.Reinforcements: {
-        if (underHeavyAttack || troopRatio < 0.3) return false;
-        return this.random.nextInt(0, 100) < (isFriendlyRel ? 80 : 60);
+        if (underHeavyAttack || troopRatio < 0.25) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 88 : 70);
       }
       case AllianceActionType.GoldAid: {
-        if (this.player.gold() < 80_000n) return false;
-        return this.random.nextInt(0, 100) < (isFriendlyRel ? 75 : 55);
+        if (this.player.gold() < 75_000n) return false;
+        return this.random.nextInt(0, 100) < (isFriendlyRel ? 85 : 65);
       }
       case AllianceActionType.DefenseAid: {
-        if (troopRatio < 0.22) return false;
-        return this.random.nextInt(0, 100) < (underHeavyAttack ? 45 : 85);
+        if (troopRatio < 0.18) return false;
+        return this.random.nextInt(0, 100) < (underHeavyAttack ? 55 : 92);
       }
       case AllianceActionType.JointAttack: {
         if (targetID === null || !this.game.hasPlayer(targetID)) return false;

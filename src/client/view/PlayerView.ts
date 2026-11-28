@@ -31,6 +31,7 @@ import {
   applyScienceBuildingModifiers,
   CROWNFALL_CONFIG,
 } from "@openfront/engine-lib/configuration/CrownfallConfig";
+import { CROWNFALL_TRADE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallTrade";
 import { applyActiveProjectModifiers } from "@openfront/engine-lib/configuration/CrownfallProjects";
 import {
   computeCrownfallPathModifiers,
@@ -535,10 +536,11 @@ export class PlayerView implements PlayerLike {
     let net = 0;
     for (const agr of this.tradeAgreements()) {
       const isProposer = agr.proposerID === this.id();
+      const rate = CROWNFALL_TRADE_CONFIG.foodShipmentPerSec;
       if (agr.tradeType === "import_food") {
-        net += isProposer ? 15 : -15;
+        net += isProposer ? rate : -rate;
       } else if (agr.tradeType === "export_food") {
-        net += isProposer ? -15 : 15;
+        net += isProposer ? -rate : rate;
       }
     }
     return net;

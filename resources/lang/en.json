@@ -1914,8 +1914,8 @@
     "trade_cancelled": "{name} ended your Trade Agreement.",
     "trade_war_cancelled": "Warfare! Your Trade Agreement with {name} was automatically terminated.",
     "trade": {
-      "type_import_food": "Import Food (+900/m)",
-      "type_export_food": "Export Food (+90K Gold/m)",
+      "type_import_food": "Import Food (+1.5K Food/m · -150K Gold/m)",
+      "type_export_food": "Export Food (-1.5K Food/m · +150K Gold/m)",
       "type_commerce_pact": "Commerce Pact (+Gold & Trade)",
       "type_research_pact": "Research Pact (+SCI & Gold)"
     },

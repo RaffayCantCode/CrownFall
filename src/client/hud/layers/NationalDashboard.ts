@@ -16,7 +16,6 @@ import {
 import {
   type AllianceActionReplyUpdate,
   type AllianceActionRequestUpdate,
-  type BountyUpdate,
   GameUpdateType,
 } from "@openfront/engine-api/game/GameUpdates";
 import { CROWNFALL_ALLIANCE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallAlliances";
@@ -34,10 +33,7 @@ import {
   computeFoodStabilityDelta,
   type FoodBreakdown,
 } from "@openfront/engine-lib/configuration/CrownfallFood";
-import {
-  CROWNFALL_TRADE_CONFIG,
-  effectivePartnerPath,
-} from "@openfront/engine-lib/configuration/CrownfallTrade";
+import { CROWNFALL_TRADE_CONFIG } from "@openfront/engine-lib/configuration/CrownfallTrade";
 import {
   DEV_PATH_TIERS,
   maxTierForPath,
@@ -361,7 +357,6 @@ type OpenHudMenu =
   | "none"
   | "stability"
   | "food"
-  | "bounty"
   | "buildings"
   | "arsenal"
   | "paths"
@@ -429,7 +424,6 @@ export class NationalDashboard extends LitElement implements Controller {
   @state() private _projectCooldownUntilTick = 0;
   @state() private _selectedAugments: readonly AugmentId[] = [];
   @state() private _ghostStructure: PlayerBuildableUnitType | null = null;
-  @state() private _activeBounty: BountyUpdate | null = null;
   @state() private _allyCount = 0;
   @state() private _buildingsAlert = false;
   @state() private _arsenalAlert = false;
@@ -517,7 +511,6 @@ export class NationalDashboard extends LitElement implements Controller {
   init(): void {
     this._visible = false;
     this._openPanel = "none";
-    this._activeBounty = null;
     this._playerBuildables = [];
     this._buildablesRefreshTick = -10;
     this._knownCivicAffordable.clear();
@@ -730,15 +723,6 @@ export class NationalDashboard extends LitElement implements Controller {
 
     const updates = this.game.updatesSinceLastTick();
     if (!updates) return;
-
-    const bountyUpdates = updates[GameUpdateType.Bounty];
-    if (bountyUpdates && bountyUpdates.length > 0) {
-      const latest = bountyUpdates[bountyUpdates.length - 1];
-      this._activeBounty = latest.active ? latest : null;
-      if (!latest.active && this._openPanel === "bounty") {
-        this._openPanel = "none";
-      }
-    }
 
     const actionReqs = updates[GameUpdateType.AllianceActionRequest];
     if (actionReqs && actionReqs.length > 0) {
@@ -1241,91 +1225,6 @@ export class NationalDashboard extends LitElement implements Controller {
     `;
   }
 
-  private renderBountyPanel() {
-    if (
-      this._openPanel !== "bounty" ||
-      !this._activeBounty ||
-      this.game.config().disableBounties()
-    ) {
-      return nothing;
-    }
-    const b = this._activeBounty;
-    const myPlayer = this.game.myPlayer();
-    const isMe = myPlayer !== null && myPlayer.id() === b.targetID;
-    const mins = Math.floor(b.secondsRemaining / 60);
-    const secs = `${b.secondsRemaining % 60}`.padStart(2, "0");
-    const targetView =
-      b.targetID !== null
-        ? (this.game.playerViews().find((p) => p.id() === b.targetID) ?? null)
-        : null;
-    const foodEnabled = !this.game.config().disableFood();
-    const rewardPool = [
-      "Gold Jackpot",
-      "Troop Reinforcements",
-      "Civilian Boom",
-      ...(foodEnabled ? ["Food Reserves"] : []),
-      "Science Boost",
-      "45s Military Efficiency",
-      "45s Economic Advantage",
-    ];
-
-    return html`
-      <div
-        class="${this.popoverPositionClass(
-          "narrow",
-        )} rounded-xl border border-rose-500/45 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
-      >
-        <div
-          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2 font-bold text-rose-300"
-        >
-          <span>Global Bounty Event</span>
-          <span class="font-mono text-amber-300">${mins}:${secs}</span>
-        </div>
-        <div class="space-y-2 text-xs">
-          <div class="flex items-center justify-between gap-2">
-            <div>
-              <div class="text-[10.5px] uppercase tracking-wider text-[#9aa3b2]">
-                Target Nation
-              </div>
-              <div class="font-bold text-white flex items-center gap-1.5">
-                <span>${b.targetName}</span>
-                ${isMe
-                  ? html`<span
-                      class="rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] font-extrabold text-rose-200"
-                      >YOU</span
-                    >`
-                  : nothing}
-              </div>
-            </div>
-            ${targetView
-              ? html`<button
-                  type="button"
-                  @click=${() =>
-                    this.eventBus.emit(new GoToPlayerEvent(targetView))}
-                  class="rounded-md border border-rose-400/50 bg-rose-500/20 px-2.5 py-1 text-[11px] font-bold text-rose-200 hover:bg-rose-500/30 cursor-pointer"
-                >
-                  Locate
-                </button>`
-              : nothing}
-          </div>
-          <div class="border-t border-white/10 pt-2">
-            <div class="text-[10.5px] uppercase tracking-wider text-[#9aa3b2] mb-1">
-              1 Random Elimination Reward
-            </div>
-            <div class="flex flex-wrap gap-1">
-              ${rewardPool.map(
-                (label) => html`<span
-                  class="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10.5px] text-slate-200"
-                  >${label}</span
-                >`,
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   private renderBuildingCard(
     entry: BuildingMenuEntry,
     myPlayer: PlayerView,
@@ -1782,7 +1681,7 @@ export class NationalDashboard extends LitElement implements Controller {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[42dvh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-[42dvh] overflow-y-auto pr-1">
           ${displayedProjects.map((def) => {
             const unlocked = isProjectUnlocked(this._progress, def.id);
             const isActive = this._activeProject === def.id;
@@ -1947,793 +1846,544 @@ export class NationalDashboard extends LitElement implements Controller {
     const canDonateGoldHuman = this.game.config().gameConfig().donateGold;
     const canDonateTroopsHuman = this.game.config().gameConfig().donateTroops;
 
+    const amUnderAttack = myPlayer.incomingAttacks().length > 0;
+    const showFoodTrade = !tradeDisabled && !foodDisabled;
+
     return html`
       <div
         class="${this.popoverPositionClass(
           "medium",
-        )} rounded-2xl border border-[#d4af37]/40 bg-[#080b12]/98 p-4 text-sm text-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.92)] backdrop-blur-md z-50"
+        )} rounded-xl border border-[#d4af37]/40 bg-[#080b12]/96 p-3.5 text-xs text-slate-200 shadow-[0_20px_56px_rgba(0,0,0,0.9)] backdrop-blur-md z-50"
       >
         <div
-          class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3"
+          class="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5"
         >
           <div>
-            <span class="text-sm font-bold tracking-wider uppercase text-[#f3d27a]">
-              ${tradeDisabled ? "Alliances" : "Alliances & Trade"}
+            <span class="text-xs font-bold tracking-wider uppercase text-[#f3d27a]">
+              ${showFoodTrade ? "Alliances & Food Trade" : "Alliances"}
             </span>
-            <span class="ml-2 text-xs text-[#9aa3b2]">
-              Allies: ${allies.length}${tradeDisabled
-                ? ""
-                : ` · Trades: ${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer}`}
+            <span class="ml-2 text-[11px] text-[#9aa3b2]">
+              Allies: ${allies.length} (Auto-Defend)${showFoodTrade
+                ? ` · Food Deals: ${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer}`
+                : ""}
             </span>
           </div>
           <button
             type="button"
             @click=${() => this.togglePanel("alliances")}
-            class="text-slate-400 hover:text-white px-1.5 text-base cursor-pointer"
+            class="text-slate-400 hover:text-white px-1 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div class="space-y-3 max-h-[45dvh] overflow-y-auto pr-1">
-          <!-- Incoming Allied Pact Requests (Troops/Gold/Joint Attack) -->
-          ${
-            this._incomingActionRequests.length > 0
-              ? html`
-                  <div class="space-y-2">
-                    <div class="text-xs font-bold uppercase tracking-wider text-amber-300">
-                      Incoming Allied Requests (${this._incomingActionRequests.length})
-                    </div>
-                    ${this._incomingActionRequests.map((req) => {
-                      const sender = this.game.playerBySmallID(
-                        req.requestorID,
-                      ) as PlayerView | null;
-                      const senderName = sender?.displayName?.() ?? "Ally";
-                      const targetName =
-                        req.targetID !== null
-                          ? ((
-                              this.game.playerBySmallID(
-                                req.targetID,
-                              ) as PlayerView | null
-                            )?.displayName?.() ?? "")
-                          : "";
-                      const secLeft = Math.max(
-                        0,
-                        Math.ceil((req.expiresAt - this._currentTick) / 10),
+        <div class="space-y-2.5 max-h-[42dvh] overflow-y-auto pr-1">
+          <!-- Incoming Requests (Alliance Proposals + Allied Aid + Food Trade) -->
+          ${this._incomingActionRequests.map((req) => {
+            const sender = this.game.playerBySmallID(
+              req.requestorID,
+            ) as PlayerView | null;
+            const senderName = sender?.displayName?.() ?? "Ally";
+            const secLeft = Math.max(
+              0,
+              Math.ceil((req.expiresAt - this._currentTick) / 10),
+            );
+            return html`
+              <div
+                class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/45 bg-amber-500/10 px-3 py-2"
+              >
+                <span class="text-xs font-semibold text-amber-100">
+                  ${senderName}:
+                  ${translateText(`crownfall.alliance.label_${req.actionType}`)}
+                  <span class="ml-1 font-mono text-amber-300"
+                    >(${secLeft}s)</span
+                  >
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    @click=${() => {
+                      this.eventBus?.emit(
+                        new SendAllianceActionReplyIntentEvent(
+                          req.requestID,
+                          true,
+                        ),
                       );
-                      const label =
-                        req.actionType === AllianceActionType.JointAttack &&
-                        targetName
-                          ? `${senderName} requests Joint Attack on ${targetName}`
-                          : `${senderName}: ${translateText(`crownfall.alliance.label_${req.actionType}`)}`;
+                      this._incomingActionRequests =
+                        this._incomingActionRequests.filter(
+                          (r) => r.requestID !== req.requestID,
+                        );
+                    }}
+                    class="rounded bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 text-[11px] font-bold text-[#080b12] cursor-pointer"
+                  >
+                    Help Ally
+                  </button>
+                  <button
+                    type="button"
+                    @click=${() => {
+                      this.eventBus?.emit(
+                        new SendAllianceActionReplyIntentEvent(
+                          req.requestID,
+                          false,
+                        ),
+                      );
+                      this._incomingActionRequests =
+                        this._incomingActionRequests.filter(
+                          (r) => r.requestID !== req.requestID,
+                        );
+                    }}
+                    class="rounded border border-rose-400/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-200 cursor-pointer"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            `;
+          })}
+
+          ${incomingProposals.map(
+            (p) => html`
+              <div
+                class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2"
+              >
+                <div>
+                  <span class="text-xs font-bold text-white"
+                    >${p.displayName()}</span
+                  >
+                  <span class="ml-1.5 text-[11px] text-slate-300 font-mono">
+                    ${renderTroops(p.troops())} troops
+                  </span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    @click=${() =>
+                      this.eventBus?.emit(new GoToPlayerEvent(p))}
+                    class="rounded border border-white/15 bg-[#171f2e] px-2 py-1 text-[11px] text-slate-200 cursor-pointer"
+                  >
+                    Locate
+                  </button>
+                  <button
+                    type="button"
+                    @click=${() =>
+                      this.eventBus?.emit(
+                        new SendAllianceRequestIntentEvent(myPlayer, p),
+                      )}
+                    class="rounded bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 text-[11px] font-bold text-[#080b12] cursor-pointer"
+                  >
+                    Accept Ally
+                  </button>
+                  <button
+                    type="button"
+                    @click=${() =>
+                      this.eventBus?.emit(new SendAllianceRejectIntentEvent(p))}
+                    class="rounded border border-rose-400/40 bg-rose-500/15 px-2 py-1 text-[11px] text-rose-200 cursor-pointer"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            `,
+          )}
+
+          ${showFoodTrade
+            ? incomingTradeReqs.map((req) => {
+                const sender = allPlayers.find(
+                  (p) => p.id() === req.proposerID,
+                );
+                const sName = sender?.displayName() ?? "Nation";
+                const desc =
+                  req.tradeType === TradeAgreementType.ImportFood
+                    ? `${sName} wants to buy your Food (-1.5K Food/m · You get +150K Gold/m)`
+                    : req.tradeType === TradeAgreementType.ExportFood
+                      ? `${sName} offers Food (+1.5K Food/m · You pay 150K Gold/m)`
+                      : `${sName}: ${translateText(`crownfall.trade.type_${req.tradeType}`)}`;
+                return html`
+                  <div
+                    class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2"
+                  >
+                    <span class="text-xs font-semibold text-sky-100"
+                      >${desc}</span
+                    >
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        @click=${() =>
+                          this.eventBus?.emit(
+                            new SendTradeReplyIntentEvent(req.id, true),
+                          )}
+                        class="rounded bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 text-[11px] font-bold text-[#080b12] cursor-pointer"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        @click=${() =>
+                          this.eventBus?.emit(
+                            new SendTradeReplyIntentEvent(req.id, false),
+                          )}
+                        class="rounded border border-rose-400/40 bg-rose-500/15 px-2.5 py-1 text-[11px] text-rose-200 cursor-pointer"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                `;
+              })
+            : nothing}
+
+          <!-- Active Allies (Simple Mutual Defense & Direct Support) -->
+          <div>
+            <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9aa3b2]">
+              Active Allies
+            </div>
+            ${allies.length === 0
+              ? html`
+                  <div
+                    class="rounded-lg border border-white/[0.07] bg-[#101622] px-3 py-2.5 text-xs text-[#9aa3b2]"
+                  >
+                    ${alliancesDisabled
+                      ? "Alliances are disabled in match settings."
+                      : "No allies yet. Click a nation on the map to propose an alliance — allies automatically counter-attack invaders and share mutual aid."}
+                  </div>
+                `
+              : html`
+                  <div class="space-y-2">
+                    ${allies.map((ally) => {
+                      const allianceView = allianceMap.get(ally.id());
+                      const isTeammate = myPlayer.isOnSameTeam(ally);
+                      const pactSecLeft = allianceView
+                        ? Math.max(
+                            0,
+                            Math.ceil(
+                              (allianceView.expiresAt - this._currentTick) / 10,
+                            ),
+                          )
+                        : null;
+                      const canRenew = Boolean(
+                        allianceView?.hasExtensionRequest,
+                      );
+                      const outgoing = this._outgoingActionByAlly.get(
+                        ally.id(),
+                      );
+                      const awaitingSec =
+                        outgoing && outgoing.expiresAt > this._currentTick
+                          ? Math.ceil(
+                              (outgoing.expiresAt - this._currentTick) / 10,
+                            )
+                          : 0;
+                      const cooldownSec =
+                        outgoing &&
+                        awaitingSec === 0 &&
+                        outgoing.cooldownUntil > this._currentTick
+                          ? Math.ceil(
+                              (outgoing.cooldownUntil - this._currentTick) / 10,
+                            )
+                          : 0;
+                      const actionBusy = awaitingSec > 0 || cooldownSec > 0;
+                      const canDirectDonateGold =
+                        (ally.type() !== PlayerType.Human ||
+                          canDonateGoldHuman) &&
+                        myPlayer.gold() > 0n;
+                      const canDirectDonateTroops =
+                        (ally.type() !== PlayerType.Human ||
+                          canDonateTroopsHuman) &&
+                        myPlayer.troops() > 100;
 
                       return html`
                         <div
-                          class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/45 bg-amber-500/10 px-3.5 py-2.5"
+                          class="rounded-lg border border-white/10 bg-[#101622] p-2.5 space-y-2"
                         >
-                          <div class="text-xs font-semibold text-amber-100">
-                            ${label}
-                            <span class="ml-1.5 font-mono text-amber-300"
-                              >(${secLeft}s)</span
-                            >
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-2 min-w-0">
+                              <span class="text-xs font-bold text-[#f4f1ea] truncate">
+                                ${ally.displayName()}
+                              </span>
+                              <span class="text-[11px] text-[#9aa3b2] font-mono">
+                                ${renderTroops(ally.troops())} troops ·
+                                ${renderNumber(ally.gold())} Gold
+                              </span>
+                              ${pactSecLeft !== null
+                                ? html`<span
+                                    class="text-[10.5px] font-mono ${pactSecLeft <=
+                                    30
+                                      ? "text-amber-300 font-bold"
+                                      : "text-slate-400"}"
+                                  >
+                                    ⏱ ${pactSecLeft}s
+                                  </span>`
+                                : nothing}
+                            </div>
+
+                            <div class="flex items-center gap-1">
+                              ${awaitingSec > 0
+                                ? html`<span
+                                    class="rounded bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-amber-200"
+                                    >Waiting (${awaitingSec}s)</span
+                                  >`
+                                : cooldownSec > 0
+                                  ? html`<span
+                                      class="rounded bg-slate-800 px-2 py-0.5 text-[10.5px] font-mono text-slate-400"
+                                      >${cooldownSec}s CD</span
+                                    >`
+                                  : nothing}
+                              ${canRenew
+                                ? html`<button
+                                    type="button"
+                                    @click=${() =>
+                                      this.eventBus?.emit(
+                                        new SendAllianceExtensionIntentEvent(
+                                          ally,
+                                        ),
+                                      )}
+                                    class="rounded bg-emerald-500 hover:bg-emerald-400 px-2 py-0.5 text-[11px] font-bold text-[#080b12] cursor-pointer"
+                                  >
+                                    Renew
+                                  </button>`
+                                : nothing}
+                              <button
+                                type="button"
+                                @click=${() =>
+                                  this.eventBus?.emit(new GoToPlayerEvent(ally))}
+                                class="rounded border border-white/15 bg-[#171f2e] px-2 py-0.5 text-[11px] text-slate-200 cursor-pointer"
+                              >
+                                Locate
+                              </button>
+                              ${!isTeammate
+                                ? html`<button
+                                    type="button"
+                                    @click=${() =>
+                                      this.eventBus?.emit(
+                                        new SendBreakAllianceIntentEvent(
+                                          myPlayer,
+                                          ally,
+                                        ),
+                                      )}
+                                    class="rounded border border-rose-500/35 bg-rose-500/10 px-2 py-0.5 text-[11px] text-rose-300 cursor-pointer"
+                                  >
+                                    Break
+                                  </button>`
+                                : nothing}
+                            </div>
                           </div>
-                          <div class="flex items-center gap-2">
+
+                          <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                             <button
                               type="button"
-                              @click=${() => {
+                              ?disabled=${actionBusy}
+                              @click=${() =>
                                 this.eventBus?.emit(
-                                  new SendAllianceActionReplyIntentEvent(
-                                    req.requestID,
-                                    true,
+                                  new SendAllianceActionRequestIntentEvent(
+                                    ally.id(),
+                                    AllianceActionType.DefenseAid,
+                                    null,
                                   ),
-                                );
-                                this._incomingActionRequests =
-                                  this._incomingActionRequests.filter(
-                                    (r) => r.requestID !== req.requestID,
-                                  );
-                              }}
-                              class="rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1 text-xs font-bold text-[#080b12] cursor-pointer"
+                                )}
+                              class="rounded border px-2 py-1 text-[11px] font-bold transition ${!actionBusy
+                                ? amUnderAttack
+                                  ? "border-rose-400 bg-rose-500/25 text-rose-100 animate-pulse cursor-pointer"
+                                  : "border-indigo-400/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 cursor-pointer"
+                                : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"}"
                             >
-                              Accept
+                              Defend Me
                             </button>
                             <button
                               type="button"
-                              @click=${() => {
+                              ?disabled=${actionBusy}
+                              @click=${() =>
                                 this.eventBus?.emit(
-                                  new SendAllianceActionReplyIntentEvent(
-                                    req.requestID,
-                                    false,
+                                  new SendAllianceActionRequestIntentEvent(
+                                    ally.id(),
+                                    AllianceActionType.Reinforcements,
+                                    null,
                                   ),
-                                );
-                                this._incomingActionRequests =
-                                  this._incomingActionRequests.filter(
-                                    (r) => r.requestID !== req.requestID,
-                                  );
-                              }}
-                              class="rounded-lg border border-rose-400/40 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-1 text-xs font-semibold text-rose-200 cursor-pointer"
+                                )}
+                              class="rounded border px-2 py-1 text-[11px] font-semibold transition ${!actionBusy
+                                ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200 cursor-pointer"
+                                : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"}"
                             >
-                              Decline
+                              Ask Troops
+                            </button>
+                            <button
+                              type="button"
+                              ?disabled=${actionBusy}
+                              @click=${() =>
+                                this.eventBus?.emit(
+                                  new SendAllianceActionRequestIntentEvent(
+                                    ally.id(),
+                                    AllianceActionType.GoldAid,
+                                    null,
+                                  ),
+                                )}
+                              class="rounded border px-2 py-1 text-[11px] font-semibold transition ${!actionBusy
+                                ? "border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 text-sky-200 cursor-pointer"
+                                : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"}"
+                            >
+                              Ask Gold
+                            </button>
+                            <button
+                              type="button"
+                              ?disabled=${!canDirectDonateTroops}
+                              @click=${() =>
+                                this.eventBus?.emit(
+                                  new SendDonateTroopsIntentEvent(ally, null),
+                                )}
+                              class="rounded border px-2 py-1 text-[11px] font-semibold transition ${canDirectDonateTroops
+                                ? "border-white/15 bg-[#171f2e] hover:border-emerald-400/50 text-emerald-200 cursor-pointer"
+                                : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"}"
+                            >
+                              Send Troops
+                            </button>
+                            <button
+                              type="button"
+                              ?disabled=${!canDirectDonateGold}
+                              @click=${() =>
+                                this.eventBus?.emit(
+                                  new SendDonateGoldIntentEvent(ally, null),
+                                )}
+                              class="rounded border px-2 py-1 text-[11px] font-semibold transition ${canDirectDonateGold
+                                ? "border-white/15 bg-[#171f2e] hover:border-[#d4af37]/50 text-[#f3d27a] cursor-pointer"
+                                : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"}"
+                            >
+                              Send Gold
                             </button>
                           </div>
                         </div>
                       `;
                     })}
                   </div>
-                `
-              : nothing
-          }
-
-          <!-- Incoming Alliance Proposals -->
-          ${
-            incomingProposals.length > 0
-              ? html`
-                  <div class="space-y-2">
-                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                      Incoming Alliance Proposals (${incomingProposals.length})
-                    </div>
-                    ${incomingProposals.map(
-                      (p) => html`
-                        <div
-                          class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-3.5 py-2.5"
-                        >
-                          <div>
-                            <div class="text-sm font-bold text-white">
-                              ${p.displayName()}
-                            </div>
-                            <div class="text-xs text-slate-300 font-mono">
-                              Troops: ${renderTroops(p.troops())} · Gold:
-                              ${renderNumber(p.gold())}
-                            </div>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <button
-                              type="button"
-                              @click=${() =>
-                                this.eventBus?.emit(new GoToPlayerEvent(p))}
-                              class="rounded-lg border border-white/15 bg-[#171f2e] px-2.5 py-1 text-xs font-semibold text-slate-200 cursor-pointer"
-                            >
-                              Locate
-                            </button>
-                            <button
-                              type="button"
-                              @click=${() =>
-                                this.eventBus?.emit(
-                                  new SendAllianceRequestIntentEvent(
-                                    myPlayer,
-                                    p,
-                                  ),
-                                )}
-                              class="rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-1 text-xs font-bold text-[#080b12] cursor-pointer"
-                            >
-                              Accept Pact
-                            </button>
-                            <button
-                              type="button"
-                              @click=${() =>
-                                this.eventBus?.emit(
-                                  new SendAllianceRejectIntentEvent(p),
-                                )}
-                              class="rounded-lg border border-rose-400/40 bg-rose-500/15 hover:bg-rose-500/25 px-2.5 py-1 text-xs font-semibold text-rose-200 cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </div>
-                      `,
-                    )}
-                  </div>
-                `
-              : nothing
-          }
-
-          <!-- Active Allies & Full Pact Controls -->
-          <div>
-            <div class="mb-2 text-xs font-semibold uppercase tracking-widest text-[#9aa3b2]">
-              Active Allies &amp; Trade / War Coordination
-            </div>
-            ${
-              allies.length === 0
-                ? html`
-                    <div
-                      class="rounded-xl border border-white/[0.07] bg-[#101622] p-4 text-center text-[#9aa3b2]"
-                    >
-                      <div class="text-sm font-semibold text-[#f4f1ea] mb-1">
-                        ${
-                          alliancesDisabled
-                            ? "Alliances Disabled in Match Settings"
-                            : "No Active Alliances Yet"
-                        }
-                      </div>
-                      <div class="text-xs leading-relaxed">
-                        ${
-                          alliancesDisabled
-                            ? "Custom match settings disabled diplomatic alliances for this game."
-                            : "Propose a pact to any nation below (or right-click on the map) to unlock Troops-for-Gold deals, emergency subsidies, defensive aid, and joint offensives."
-                        }
-                      </div>
-                    </div>
-                  `
-                : html`
-                    <div class="space-y-3">
-                      ${allies.map((ally) => {
-                        const allianceView = allianceMap.get(ally.id());
-                        const isTeammate = myPlayer.isOnSameTeam(ally);
-                        const pactSecLeft = allianceView
-                          ? Math.max(
-                              0,
-                              Math.ceil(
-                                (allianceView.expiresAt - this._currentTick) /
-                                  10,
-                              ),
-                            )
-                          : null;
-                        const canRenew = Boolean(
-                          allianceView?.hasExtensionRequest,
-                        );
-                        const outgoing = this._outgoingActionByAlly.get(
-                          ally.id(),
-                        );
-                        const awaitingSec =
-                          outgoing && outgoing.expiresAt > this._currentTick
-                            ? Math.ceil(
-                                (outgoing.expiresAt - this._currentTick) / 10,
-                              )
-                            : 0;
-                        const cooldownSec =
-                          outgoing &&
-                          awaitingSec === 0 &&
-                          outgoing.cooldownUntil > this._currentTick
-                            ? Math.ceil(
-                                (outgoing.cooldownUntil - this._currentTick) /
-                                  10,
-                              )
-                            : 0;
-                        const actionBusy = awaitingSec > 0 || cooldownSec > 0;
-
-                        const canDirectDonateGold =
-                          (ally.type() !== PlayerType.Human ||
-                            canDonateGoldHuman) &&
-                          myPlayer.gold() > 0n;
-                        const canDirectDonateTroops =
-                          (ally.type() !== PlayerType.Human ||
-                            canDonateTroopsHuman) &&
-                          myPlayer.troops() > 100;
-
-
-
-                        return html`
-                          <div
-                            class="rounded-xl border border-white/10 bg-[#101622] p-3.5 space-y-2.5"
-                          >
-                            <!-- Header row -->
-                            <div
-                              class="flex flex-wrap items-center justify-between gap-2"
-                            >
-                              <div class="min-w-0">
-                                <div class="flex items-center gap-2">
-                                  <span
-                                    class="text-sm font-bold text-[#f4f1ea] truncate"
-                                  >
-                                    ${ally.displayName()}
-                                  </span>
-                                  <span
-                                    class="rounded bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-300"
-                                  >
-                                    ${
-                                      isTeammate
-                                        ? "Teammate"
-                                        : ally.type() === PlayerType.Human
-                                          ? "Player Ally"
-                                          : "AI Ally"
-                                    }
-                                  </span>
-                                  ${
-                                    pactSecLeft !== null
-                                      ? html`<span
-                                          class="text-[11px] font-mono ${
-                                            pactSecLeft <= 30
-                                              ? "text-amber-300 font-bold"
-                                              : "text-[#9aa3b2]"
-                                          }"
-                                        >
-                                          ⏱ ${pactSecLeft}s
-                                        </span>`
-                                      : nothing
-                                  }
-                                </div>
-                                <div
-                                  class="text-xs text-[#9aa3b2] tabular-nums mt-0.5"
-                                >
-                                  Troops: ${renderTroops(ally.troops())} · Gold:
-                                  ${renderNumber(ally.gold())}
-                                </div>
-                              </div>
-
-                              <div class="flex flex-wrap items-center gap-1.5">
-                                ${
-                                  awaitingSec > 0
-                                    ? html`<span
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold text-amber-200"
-                                      >
-                                        <span
-                                          class="h-2 w-2 rounded-full bg-amber-300 animate-ping"
-                                        ></span>
-                                        Awaiting reply (${awaitingSec}s)
-                                      </span>`
-                                    : cooldownSec > 0
-                                      ? html`<span
-                                          class="rounded-lg border border-white/10 bg-slate-800/80 px-2.5 py-1 text-[11px] font-mono text-slate-300"
-                                        >
-                                          Next pact in ${cooldownSec}s
-                                        </span>`
-                                      : nothing
-                                }
-                                ${
-                                  canRenew
-                                    ? html`<button
-                                        type="button"
-                                        @click=${() =>
-                                          this.eventBus?.emit(
-                                            new SendAllianceExtensionIntentEvent(
-                                              ally,
-                                            ),
-                                          )}
-                                        class="rounded-lg bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 text-xs font-bold text-[#080b12] cursor-pointer"
-                                      >
-                                        Renew Pact
-                                      </button>`
-                                    : nothing
-                                }
-                                <button
-                                  type="button"
-                                  @click=${() =>
-                                    this.eventBus?.emit(
-                                      new GoToPlayerEvent(ally),
-                                    )}
-                                  class="rounded-lg border border-white/15 bg-[#171f2e] hover:border-[#d4af37]/50 px-2.5 py-1 text-xs font-semibold text-[#f4f1ea] cursor-pointer"
-                                >
-                                  Locate
-                                </button>
-                                ${
-                                  !isTeammate
-                                    ? html`<button
-                                        type="button"
-                                        @click=${() =>
-                                          this.eventBus?.emit(
-                                            new SendBreakAllianceIntentEvent(
-                                              myPlayer,
-                                              ally,
-                                            ),
-                                          )}
-                                        class="rounded-lg border border-rose-500/35 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 text-xs font-semibold text-rose-300 cursor-pointer"
-                                      >
-                                        Break
-                                      </button>`
-                                    : nothing
-                                }
-                              </div>
-                            </div>
-
-                            <!-- Action Buttons Grid: Trades, Aid, Donations -->
-                            <div
-                              class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1"
-                            >
-                              <button
-                                type="button"
-                                ?disabled=${
-                                  actionBusy ||
-                                  this._gold <
-                                    CROWNFALL_ALLIANCE_CONFIG.troopsForGoldMinPayment
-                                }
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceActionRequestIntentEvent(
-                                      ally.id(),
-                                      AllianceActionType.TroopsForGold,
-                                      null,
-                                    ),
-                                  )}
-                                title="Pay 50K–100K Gold to purchase 25% of this ally's troops"
-                                class="rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${
-                                  !actionBusy &&
-                                  this._gold >=
-                                    CROWNFALL_ALLIANCE_CONFIG.troopsForGoldMinPayment
-                                    ? "border-[#d4af37]/50 bg-[#d4af37]/15 hover:bg-[#d4af37]/25 text-[#f3d27a] cursor-pointer"
-                                    : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                }"
-                              >
-                                Buy Troops (${
-                                  this._gold >= 100_000n ? "100K" : "50K"
-                                } Gold)
-                              </button>
-
-                              <button
-                                type="button"
-                                ?disabled=${
-                                  actionBusy ||
-                                  myPlayer.troops() <
-                                    CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinTroops
-                                }
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceActionRequestIntentEvent(
-                                      ally.id(),
-                                      AllianceActionType.GoldForTroops,
-                                      null,
-                                    ),
-                                  )}
-                                title="Send 20% of your troops in exchange for 50K–100K allied Gold"
-                                class="rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${
-                                  !actionBusy &&
-                                  myPlayer.troops() >=
-                                    CROWNFALL_ALLIANCE_CONFIG.goldForTroopsMinTroops
-                                    ? "border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 cursor-pointer"
-                                    : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                }"
-                              >
-                                Troops → Gold
-                              </button>
-
-                              <button
-                                type="button"
-                                ?disabled=${actionBusy}
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceActionRequestIntentEvent(
-                                      ally.id(),
-                                      AllianceActionType.Reinforcements,
-                                      null,
-                                    ),
-                                  )}
-                                class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                                  !actionBusy
-                                    ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200 cursor-pointer"
-                                    : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                }"
-                              >
-                                Request Troops
-                              </button>
-
-                              <button
-                                type="button"
-                                ?disabled=${actionBusy}
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceActionRequestIntentEvent(
-                                      ally.id(),
-                                      AllianceActionType.GoldAid,
-                                      null,
-                                    ),
-                                  )}
-                                class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                                  !actionBusy
-                                    ? "border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 text-sky-200 cursor-pointer"
-                                    : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                }"
-                              >
-                                Request Gold
-                              </button>
-
-                              <button
-                                type="button"
-                                ?disabled=${actionBusy}
-                                @click=${() =>
-                                  this.eventBus?.emit(
-                                    new SendAllianceActionRequestIntentEvent(
-                                      ally.id(),
-                                      AllianceActionType.DefenseAid,
-                                      null,
-                                    ),
-                                  )}
-                                class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                                  !actionBusy
-                                    ? "border-indigo-400/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 cursor-pointer"
-                                    : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                }"
-                              >
-                                Defense Aid
-                              </button>
-
-                              <div class="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  ?disabled=${!canDirectDonateGold}
-                                  @click=${() =>
-                                    this.eventBus?.emit(
-                                      new SendDonateGoldIntentEvent(ally, null),
-                                    )}
-                                  title="Gift Gold directly to this ally"
-                                  class="flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
-                                    canDirectDonateGold
-                                      ? "border-white/15 bg-[#171f2e] hover:border-[#d4af37]/50 text-[#f3d27a] cursor-pointer"
-                                      : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                  }"
-                                >
-                                  Gift Gold
-                                </button>
-                                <button
-                                  type="button"
-                                  ?disabled=${!canDirectDonateTroops}
-                                  @click=${() =>
-                                    this.eventBus?.emit(
-                                      new SendDonateTroopsIntentEvent(
-                                        ally,
-                                        null,
-                                      ),
-                                    )}
-                                  title="Gift Troops directly to this ally"
-                                  class="flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition ${
-                                    canDirectDonateTroops
-                                      ? "border-white/15 bg-[#171f2e] hover:border-emerald-400/50 text-emerald-200 cursor-pointer"
-                                      : "border-white/5 bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                  }"
-                                >
-                                  Gift Troops
-                                </button>
-                              </div>
-                            </div>
-                        </div>
-                      `;
-                      })}
-                    </div>
-                  `
-            }
+                `}
           </div>
 
-          ${
-            !tradeDisabled
-              ? html`
-                  <div class="border-t border-white/10 pt-2.5 space-y-2.5">
-                    ${
-                      incomingTradeReqs.length > 0
-                        ? html`
-                            <div class="space-y-1.5">
-                              <div class="text-[11px] font-bold uppercase tracking-wider text-sky-300">
-                                Incoming Trade Proposals (${incomingTradeReqs.length})
-                              </div>
-                              ${incomingTradeReqs.map((req) => {
-                                const sender = allPlayers.find(
-                                  (p) => p.id() === req.proposerID,
-                                );
-                                const sName = sender?.displayName() ?? "Nation";
-                                return html`
-                                  <div
-                                    class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-1.5"
-                                  >
-                                    <span class="text-xs font-semibold text-sky-100">
-                                      ${sName}:
-                                      ${translateText(
-                                        `crownfall.trade.type_${req.tradeType}`,
-                                      )}
-                                    </span>
-                                    <div class="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        @click=${() =>
-                                          this.eventBus?.emit(
-                                            new SendTradeReplyIntentEvent(
-                                              req.id,
-                                              true,
-                                            ),
-                                          )}
-                                        class="rounded bg-emerald-500 hover:bg-emerald-400 px-2.5 py-0.5 text-[11px] font-bold text-[#080b12] cursor-pointer"
-                                      >
-                                        Accept
-                                      </button>
-                                      <button
-                                        type="button"
-                                        @click=${() =>
-                                          this.eventBus?.emit(
-                                            new SendTradeReplyIntentEvent(
-                                              req.id,
-                                              false,
-                                            ),
-                                          )}
-                                        class="rounded border border-rose-400/40 bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-rose-200 cursor-pointer"
-                                      >
-                                        Decline
-                                      </button>
-                                    </div>
-                                  </div>
-                                `;
-                              })}
-                            </div>
-                          `
-                        : nothing
-                    }
-
-                    <div>
-                      <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#9aa3b2]">
-                        Active Trade Agreements (${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer})
-                      </div>
-                      ${
-                        tradeAgreements.length === 0
-                          ? html`<div class="text-xs text-slate-400 italic">
-                              No active trade agreements. Propose a pact to any neighbour or ally below.
-                            </div>`
-                          : html`
-                              <div class="space-y-1.5">
-                                ${tradeAgreements.map((agr) => {
-                                  const otherID =
-                                    agr.proposerID === myPlayer.id()
-                                      ? agr.partnerID
-                                      : agr.proposerID;
-                                  const partner = allPlayers.find(
-                                    (p) => p.id() === otherID,
-                                  );
-                                  const pName =
-                                    partner?.displayName() ?? "Partner";
-                                  const myP = effectivePartnerPath(
-                                    myPlayer.primaryPath(),
-                                    myPlayer.type(),
-                                    myPlayer.smallID(),
-                                  );
-                                  const theirP = partner
-                                    ? effectivePartnerPath(
-                                        partner.primaryPath(),
-                                        partner.type(),
-                                        partner.smallID(),
-                                      )
-                                    : null;
-                                  const canCancel =
-                                    this._currentTick - agr.createdAt >=
-                                    CROWNFALL_TRADE_CONFIG.minAgreementDurationTicks;
-                                  return html`
-                                    <div
-                                      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-3 py-1.5"
-                                    >
-                                      <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <span class="font-bold text-white"
-                                          >${pName}</span
-                                        >
-                                        <span class="text-sky-300 font-semibold">
-                                          ${translateText(
-                                            `crownfall.trade.type_${agr.tradeType}`,
-                                          )}
-                                        </span>
-                                        ${
-                                          myP && theirP
-                                            ? html`<span
-                                                class="rounded bg-[#d4af37]/15 border border-[#d4af37]/35 px-1.5 py-0.5 text-[10px] font-mono text-[#f3d27a]"
-                                              >
-                                                ${myP.slice(0, 3).toUpperCase()} ⇄
-                                                ${theirP.slice(0, 3).toUpperCase()}
-                                              </span>`
-                                            : nothing
-                                        }
-                                      </div>
-                                      <button
-                                        type="button"
-                                        ?disabled=${!canCancel}
-                                        @click=${() =>
-                                          this.eventBus?.emit(
-                                            new SendTradeCancelIntentEvent(
-                                              agr.id,
-                                            ),
-                                          )}
-                                        class="rounded border px-2 py-0.5 text-[10.5px] font-semibold ${
-                                          canCancel
-                                            ? "border-rose-500/35 bg-rose-500/10 text-rose-300 cursor-pointer"
-                                            : "border-white/5 bg-slate-800/60 text-slate-500 cursor-not-allowed"
-                                        }"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  `;
-                                })}
-                              </div>
-                            `
-                      }
-                    </div>
-
-                    ${
-                      tradeAgreements.length <
-                        CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer &&
-                      tradeCandidates.length > 0
-                        ? html`
-                            <div>
-                              <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#9aa3b2]">
-                                Neighbours &amp; Allies — Propose Trade
-                              </div>
-                              <div class="space-y-1.5">
-                                ${tradeCandidates.map((cand) => {
-                                  const candPath = effectivePartnerPath(
-                                    cand.primaryPath(),
-                                    cand.type(),
-                                    cand.smallID(),
-                                  );
-                                  return html`
-                                    <div
-                                      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-2.5 py-1.5"
-                                    >
-                                      <div class="flex items-center gap-1.5 min-w-0">
-                                        <span class="text-xs font-bold text-[#f4f1ea] truncate">
-                                          ${cand.displayName()}
-                                        </span>
-                                        ${
-                                          candPath
-                                            ? html`<span
-                                                class="rounded bg-white/[0.07] px-1 py-0.5 text-[9.5px] uppercase text-slate-300"
-                                              >
-                                                ${candPath.slice(0, 3)}
-                                              </span>`
-                                            : nothing
-                                        }
-                                      </div>
-                                      <div class="flex flex-wrap items-center gap-1">
-                                        ${
-                                          !foodDisabled
-                                            ? html`
-                                                <button
-                                                  type="button"
-                                                  @click=${() =>
-                                                    this.eventBus?.emit(
-                                                      new SendTradeRequestIntentEvent(
-                                                        cand.id(),
-                                                        TradeAgreementType.ImportFood,
-                                                      ),
-                                                    )}
-                                                  class="rounded border border-lime-400/40 bg-lime-500/10 hover:bg-lime-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-lime-200 cursor-pointer"
-                                                >
-                                                  Import Food
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  @click=${() =>
-                                                    this.eventBus?.emit(
-                                                      new SendTradeRequestIntentEvent(
-                                                        cand.id(),
-                                                        TradeAgreementType.ExportFood,
-                                                      ),
-                                                    )}
-                                                  class="rounded border border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-amber-200 cursor-pointer"
-                                                >
-                                                  Export Food
-                                                </button>
-                                              `
-                                            : nothing
-                                        }
-                                        <button
-                                          type="button"
-                                          @click=${() =>
-                                            this.eventBus?.emit(
-                                              new SendTradeRequestIntentEvent(
-                                                cand.id(),
-                                                TradeAgreementType.CommercePact,
-                                              ),
-                                            )}
-                                          class="rounded border border-[#d4af37]/45 bg-[#d4af37]/15 hover:bg-[#d4af37]/25 px-2 py-0.5 text-[10.5px] font-semibold text-[#f3d27a] cursor-pointer"
-                                        >
-                                          Commerce
-                                        </button>
-                                        <button
-                                          type="button"
-                                          @click=${() =>
-                                            this.eventBus?.emit(
-                                              new SendTradeRequestIntentEvent(
-                                                cand.id(),
-                                                TradeAgreementType.ResearchPact,
-                                              ),
-                                            )}
-                                          class="rounded border border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-sky-200 cursor-pointer"
-                                        >
-                                          Research
-                                        </button>
-                                      </div>
-                                    </div>
-                                  `;
-                                })}
-                              </div>
-                            </div>
-                          `
-                        : nothing
-                    }
+          <!-- Simple Food Import & Export (Food <-> Gold) -->
+          ${showFoodTrade
+            ? html`
+                <div class="border-t border-white/10 pt-2 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9aa3b2]">
+                      Food Import &amp; Export (${tradeAgreements.length}/${CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer})
+                    </span>
+                    <span class="text-[10.5px] text-slate-400">
+                      1.5K Food/m ⇄ 150K Gold/m
+                    </span>
                   </div>
-                `
-              : nothing
-          }
 
+                  ${tradeAgreements.map((agr) => {
+                    const isProposer = agr.proposerID === myPlayer.id();
+                    const otherID = isProposer ? agr.partnerID : agr.proposerID;
+                    const partner = allPlayers.find((p) => p.id() === otherID);
+                    const pName = partner?.displayName() ?? "Partner";
+                    const isImporting =
+                      (agr.tradeType === TradeAgreementType.ImportFood &&
+                        isProposer) ||
+                      (agr.tradeType === TradeAgreementType.ExportFood &&
+                        !isProposer);
+                    const isExporting =
+                      (agr.tradeType === TradeAgreementType.ExportFood &&
+                        isProposer) ||
+                      (agr.tradeType === TradeAgreementType.ImportFood &&
+                        !isProposer);
+                    const dealText = isImporting
+                      ? "Importing +1.5K Food/m · Paying 150K Gold/m"
+                      : isExporting
+                        ? "Exporting -1.5K Food/m · Earning +150K Gold/m"
+                        : translateText(`crownfall.trade.type_${agr.tradeType}`);
+                    const dealColor = isImporting
+                      ? "text-lime-300"
+                      : "text-[#f3d27a]";
+                    const canCancel =
+                      this._currentTick - agr.createdAt >=
+                      CROWNFALL_TRADE_CONFIG.minAgreementDurationTicks;
+
+                    return html`
+                      <div
+                        class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-2.5 py-1.5"
+                      >
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                          <span class="font-bold text-white">${pName}</span>
+                          <span class="font-semibold ${dealColor}"
+                            >${dealText}</span
+                          >
+                        </div>
+                        <button
+                          type="button"
+                          ?disabled=${!canCancel}
+                          @click=${() =>
+                            this.eventBus?.emit(
+                              new SendTradeCancelIntentEvent(agr.id),
+                            )}
+                          class="rounded border px-2 py-0.5 text-[10.5px] font-semibold ${canCancel
+                            ? "border-rose-500/35 bg-rose-500/10 text-rose-300 cursor-pointer"
+                            : "border-white/5 bg-slate-800/60 text-slate-500 cursor-not-allowed"}"
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    `;
+                  })}
+
+                  ${tradeAgreements.length <
+                    CROWNFALL_TRADE_CONFIG.maxActiveAgreementsPerPlayer &&
+                  tradeCandidates.length > 0
+                    ? html`
+                        <div class="space-y-1">
+                          ${tradeCandidates.map(
+                            (cand) => html`
+                              <div
+                                class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#101622] px-2.5 py-1.5"
+                              >
+                                <span class="text-xs font-bold text-[#f4f1ea] truncate">
+                                  ${cand.displayName()}
+                                  ${myPlayer.isFriendly(cand)
+                                    ? html`<span
+                                        class="ml-1 text-[10px] font-normal text-emerald-300"
+                                        >(Ally)</span
+                                      >`
+                                    : nothing}
+                                </span>
+                                <div class="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    @click=${() =>
+                                      this.eventBus?.emit(
+                                        new SendTradeRequestIntentEvent(
+                                          cand.id(),
+                                          TradeAgreementType.ImportFood,
+                                        ),
+                                      )}
+                                    title="Receive +1,500 Food/min and pay them 150K Gold/min"
+                                    class="rounded border border-lime-400/40 bg-lime-500/10 hover:bg-lime-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-lime-200 cursor-pointer"
+                                  >
+                                    Import Food (-150K/m)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    @click=${() =>
+                                      this.eventBus?.emit(
+                                        new SendTradeRequestIntentEvent(
+                                          cand.id(),
+                                          TradeAgreementType.ExportFood,
+                                        ),
+                                      )}
+                                    title="Ship 1,500 Food/min and earn +150K Gold/min from them"
+                                    class="rounded border border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 text-[10.5px] font-semibold text-amber-200 cursor-pointer"
+                                  >
+                                    Export Food (+150K/m)
+                                  </button>
+                                </div>
+                              </div>
+                            `,
+                          )}
+                        </div>
+                      `
+                    : tradeAgreements.length === 0
+                      ? html`<div class="text-[11px] text-slate-400">
+                          Border or ally another nation to import or export Food for Gold.
+                        </div>`
+                      : nothing}
+                </div>
+              `
+            : nothing}
         </div>
       </div>
     `;
@@ -2833,7 +2483,7 @@ export class NationalDashboard extends LitElement implements Controller {
         <!-- Live Diplomatic Reply Toast Banner (removed — notifications appear in bottom-right events panel) -->
 
         ${this.renderStabilityPanel()} ${this.renderFoodPanel()}
-        ${this.renderBountyPanel()} ${this.renderBuildingsPanel()}
+        ${this.renderBuildingsPanel()}
         ${this.renderArsenalPanel()} ${this.renderPathsPanel()}
         ${this.renderOpsPanel()} ${this.renderAlliancesPanel()}
 
@@ -2947,63 +2597,6 @@ export class NationalDashboard extends LitElement implements Controller {
 
           <!-- Active Operation / Placement Status Chips -->
           <div class="flex flex-wrap items-center gap-2">
-            ${
-              this._activeBounty !== null &&
-              !this.game.config().disableBounties()
-                ? html`<div
-                    class="inline-flex items-center gap-1 rounded-lg border border-rose-500/60 bg-rose-950/75 px-2 py-0.5 text-xs font-bold text-rose-200"
-                  >
-                    <button
-                      type="button"
-                      @click=${() => this.togglePanel("bounty")}
-                      class="inline-flex items-center gap-1 cursor-pointer hover:text-white"
-                      title="Click for Global Bounty details & reward pool"
-                    >
-                      <span class="text-rose-400">BOUNTY</span>
-                      <span class="text-white max-w-[110px] truncate"
-                        >${this._activeBounty.targetName}</span
-                      >
-                      ${this.game.myPlayer()?.id() ===
-                      this._activeBounty.targetID
-                        ? html`<span
-                            class="rounded bg-rose-500/35 px-1 text-[10px] font-extrabold text-rose-100 animate-pulse"
-                            >YOU</span
-                          >`
-                        : nothing}
-                      <span class="font-mono text-amber-300"
-                        >${Math.floor(
-                          this._activeBounty.secondsRemaining / 60,
-                        )}:${`${this._activeBounty.secondsRemaining % 60}`.padStart(
-                          2,
-                          "0",
-                        )}</span
-                      >
-                    </button>
-                    ${(() => {
-                      const targetView =
-                        this._activeBounty?.targetID !== null
-                          ? (this.game
-                              .playerViews()
-                              .find(
-                                (p) => p.id() === this._activeBounty?.targetID,
-                              ) ?? null)
-                          : null;
-                      return targetView
-                        ? html`<button
-                            type="button"
-                            @click=${() =>
-                              this.eventBus.emit(
-                                new GoToPlayerEvent(targetView),
-                              )}
-                            class="ml-0.5 rounded bg-rose-500/25 px-1.5 py-0.2 text-[10.5px] font-semibold text-rose-100 hover:bg-rose-500/40 cursor-pointer"
-                          >
-                            Locate
-                          </button>`
-                        : nothing;
-                    })()}
-                  </div>`
-                : nothing
-            }
             ${
               this._activeProject !== null
                 ? html`<div

@@ -912,6 +912,44 @@ export class NationAttackBehavior extends AiAttackBehavior {
         return true;
       }
     }
+
+    // Automatic Mutual Defense: counter-attack enemies invading an ally, or send emergency troops
+    if (this.player.incomingAttacks().length === 0) {
+      const maxTroops = this.game.config().maxTroops(this.player);
+      for (const ally of this.player.allies()) {
+        const invasions = ally.incomingAttacks();
+        if (invasions.length === 0) continue;
+        if (this.player.relation(ally) < Relation.Neutral) continue;
+
+        let totalInvading = 0;
+        for (const inc of invasions) {
+          const invader = inc.attacker();
+          totalInvading += inc.troops();
+          if (
+            invader !== this.player &&
+            !this.player.isFriendly(invader) &&
+            invader.type() !== PlayerType.Bot &&
+            this.canReach(invader) &&
+            this.sendAttack(invader)
+          ) {
+            this.emojiBehavior.sendEmoji(ally, EMOJI_ASSIST_ACCEPT);
+            return true;
+          }
+        }
+
+        // If we cannot reach the invader directly, donate emergency troops when ally is hard-pressed
+        if (
+          totalInvading >= ally.troops() * 0.25 &&
+          this.homeTroops() >= maxTroops * 0.45 &&
+          this.player.canDonateTroops(ally)
+        ) {
+          const aidTroops = Math.floor(this.homeTroops() * 0.15);
+          if (aidTroops >= 2_500 && this.player.donateTroops(ally, aidTroops)) {
+            return true;
+          }
+        }
+      }
+    }
     return false;
   }
 

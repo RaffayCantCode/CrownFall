@@ -3134,6 +3134,31 @@ export class GameImpl implements Game {
       this.stats().goldWar(conqueror, conquered, goldCaptured);
     }
 
+    // Crownfall Victory Spoils: conquering an active enemy nation assimilates civilians, food reserves & morale
+    if (
+      !this._config.gameConfig().tutorial &&
+      conqueror.type() !== PlayerType.Bot &&
+      conquered.type() !== PlayerType.Bot &&
+      !conqueror.isFriendly(conquered) &&
+      !conqueror.inFiscalDeficit() &&
+      !skipGoldTransfer
+    ) {
+      const assimilatedPop = Math.floor(conquered.civilianPopulation() * 0.35);
+      if (assimilatedPop > 0) {
+        conqueror.addCivilianPopulation(assimilatedPop);
+      }
+      if (!this._config.disableFood() && conquered.food() > 0) {
+        const seizedFood = Math.floor(conquered.food() * 0.5);
+        if (seizedFood > 0) {
+          const cap = maxFoodStorage(
+            completedStructureLevels(conqueror, UnitType.Granary),
+          );
+          conqueror.addFood(seizedFood, cap);
+        }
+      }
+      conqueror.setStability(Math.min(100, conqueror.stability() + 5));
+    }
+
     // OFM: per-kill log for standings (humans-only filtered in recordKill).
     this.stats().recordKill(conqueror, conquered, this.ticks());
     // OFM live standings: attribute the elimination so the live snapshot can

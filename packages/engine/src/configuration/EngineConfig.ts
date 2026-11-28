@@ -777,7 +777,7 @@ export class EngineConfig extends Config {
     if (player.type() === PlayerType.Bot) {
       baseRate = 30n;
     } else {
-      baseRate = 55n;
+      baseRate = 75n;
     }
     return BigInt(Math.floor(Number(baseRate) * multiplier));
   }

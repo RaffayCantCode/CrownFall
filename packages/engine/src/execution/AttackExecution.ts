@@ -385,22 +385,64 @@ export class AttackExecution implements Execution {
     const defenderMods = defender !== null ? defender.pathModifiers() : null;
     const stab = this._owner.stability();
     const deficit = this._owner.inFiscalDeficit();
-    const effectiveLossPct = Math.max(
-      35,
-      Math.floor(
-        (attackerMods.attackerLossPercent *
-          crisisAttackerLossPercent(stab, deficit)) /
-          100,
-      ),
+    let rawLossPct = Math.floor(
+      (attackerMods.attackerLossPercent *
+        crisisAttackerLossPercent(stab, deficit)) /
+        100,
     );
-    const effectiveSpeedPct = Math.max(
-      40,
-      Math.floor(
-        (attackerMods.attackSpeedPercent *
-          crisisAttackSpeedPercent(stab, deficit)) /
-          100,
-      ),
+    let rawSpeedPct = Math.floor(
+      (attackerMods.attackSpeedPercent *
+        crisisAttackSpeedPercent(stab, deficit)) /
+        100,
     );
+
+    if (
+      defender !== null &&
+      defender.type() !== PlayerType.Bot &&
+      !deficit &&
+      stab >= 45
+    ) {
+      // Breakthrough momentum: once an attacking force outnumbers the defender's remaining army,
+      // front lines collapse smoothly instead of stalling into an endless war of attrition.
+      const defTroops = defender.troops();
+      if (attackTroops > defTroops * 2) {
+        rawLossPct = Math.floor((rawLossPct * 80) / 100);
+        rawSpeedPct = Math.floor((rawSpeedPct * 128) / 100);
+      } else if (attackTroops > defTroops * 1.25) {
+        rawLossPct = Math.floor((rawLossPct * 88) / 100);
+        rawSpeedPct = Math.floor((rawSpeedPct * 116) / 100);
+      }
+
+      // Unstable or bankrupt defenders suffer weaker border cohesion
+      const defStab = defender.stability();
+      if (defStab < 35) {
+        rawLossPct = Math.floor((rawLossPct * 82) / 100);
+        rawSpeedPct = Math.floor((rawSpeedPct * 118) / 100);
+      } else if (defStab < 60 || defender.inFiscalDeficit()) {
+        rawLossPct = Math.floor((rawLossPct * 92) / 100);
+        rawSpeedPct = Math.floor((rawSpeedPct * 108) / 100);
+      }
+
+      // Accessible player-vs-AI-Nation curve on Easy & Medium difficulty when funded
+      if (
+        this._owner.type() === PlayerType.Human &&
+        defender.type() === PlayerType.Nation &&
+        !deficit &&
+        this._owner.gold() > 0n
+      ) {
+        const diff = this.mg.config().gameConfig().difficulty;
+        if (diff === Difficulty.Easy) {
+          rawLossPct = Math.floor((rawLossPct * 85) / 100);
+          rawSpeedPct = Math.floor((rawSpeedPct * 115) / 100);
+        } else if (diff === Difficulty.Medium) {
+          rawLossPct = Math.floor((rawLossPct * 92) / 100);
+          rawSpeedPct = Math.floor((rawSpeedPct * 108) / 100);
+        }
+      }
+    }
+
+    const effectiveLossPct = Math.max(30, rawLossPct);
+    const effectiveSpeedPct = Math.max(40, rawSpeedPct);
     return {
       terrain: this.map.terrainType(tile),
       attackTroops,

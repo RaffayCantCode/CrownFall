@@ -391,10 +391,12 @@ export class PlayerExecution implements Execution {
       if (upkeepGold > 0n) {
         const passiveSecGold = this.config.goldAdditionRate(this.player) * 10n;
         const availableBeforeUpkeep = this.player.gold();
-        const enteredDeficit =
-          availableBeforeUpkeep < upkeepGold &&
-          upkeepGold > taxGold + passiveSecGold;
         this.player.removeGold(upkeepGold);
+        const remainingTreasury = this.player.gold();
+        const enteredDeficit =
+          (availableBeforeUpkeep < upkeepGold &&
+            upkeepGold > taxGold + passiveSecGold) ||
+          (this.player.inFiscalDeficit() && remainingTreasury < 5_000n);
         if (enteredDeficit !== this.player.inFiscalDeficit()) {
           this.player.setFiscalDeficit(enteredDeficit);
           if (enteredDeficit && isHuman) {
@@ -405,7 +407,7 @@ export class PlayerExecution implements Execution {
             );
           }
         }
-      } else if (this.player.inFiscalDeficit()) {
+      } else if (this.player.inFiscalDeficit() && this.player.gold() >= 5_000n) {
         this.player.setFiscalDeficit(false);
       }
     } else if (this.player.inFiscalDeficit()) {

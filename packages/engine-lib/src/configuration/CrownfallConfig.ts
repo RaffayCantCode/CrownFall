@@ -30,7 +30,7 @@ export const CROWNFALL_CONFIG = {
   botStabilityFloor: 50,
 
   /** Default starting National Establishment treasury when lobby startingGold is unset. */
-  defaultStartingTreasury: 115_000n,
+  defaultStartingTreasury: 150_000n,
 
   startingCivilianPop: 10_000,
   baseCivilianPopCap: 50_000,
@@ -49,32 +49,32 @@ export const CROWNFALL_CONFIG = {
   civilianScienceDivisor: 25_000,
 
   /** Administrative Capacity & Expansion Pressure tunables. */
-  baseAdminTiles: 450,
-  cityAdminTilesPerLevel: 450,
-  publicServicesAdminTilesPerLevel: 650,
-  powerPlantAdminTilesPerLevel: 300,
-  overexpansionStructuralMax: 22,
-  overexpansionVelocityMax: 12,
-  overexpansionStrainMax: -32,
+  baseAdminTiles: 500,
+  cityAdminTilesPerLevel: 650,
+  publicServicesAdminTilesPerLevel: 900,
+  powerPlantAdminTilesPerLevel: 450,
+  overexpansionStructuralMax: 18,
+  overexpansionVelocityMax: 10,
+  overexpansionStrainMax: -26,
 
   /** Military Upkeep & Campaign Finance tunables. */
-  baseFreeGarrisonTroops: 95_000,
-  tileMilitiaFreeScale: 1_650,
-  cityFreeGarrisonPerLevel: 220_000,
-  standingUpkeepPerThousandTroops: 4,
-  campaignUpkeepPerThousandPlayerTroops: 22,
-  campaignUpkeepPerThousandWildernessTroops: 2,
-  fiscalDeficitStabilityPenalty: -10,
+  baseFreeGarrisonTroops: 125_000,
+  tileMilitiaFreeScale: 1_900,
+  cityFreeGarrisonPerLevel: 250_000,
+  standingUpkeepPerThousandTroops: 3,
+  campaignUpkeepPerThousandPlayerTroops: 16,
+  campaignUpkeepPerThousandWildernessTroops: 1,
+  fiscalDeficitStabilityPenalty: -6,
 
   /** Stability target contributors. */
-  baseStabilityTarget: 62,
+  baseStabilityTarget: 65,
   publicServicesStabilityPerLevel: 7,
   publicServicesStabilityMax: 35,
   housingSurplusBonus: 5,
   housingOvercrowdedPenalty: -8,
-  activeWarStrainPerAttack: -6,
-  activeOffensiveWarStrainPerAttack: -4,
-  activeWarStrainMax: -24,
+  activeWarStrainPerAttack: -4,
+  activeOffensiveWarStrainPerAttack: -2,
+  activeWarStrainMax: -16,
 
   /** Tax rate modifiers (percentages as integers for deterministic math). */
   tax: {
@@ -183,11 +183,11 @@ export function computeTerritoryIntegrationPerSecond(
   stability: number,
   mods: CrownfallPathModifiers = NEUTRAL_PATH_MODIFIERS,
 ): number {
-  const baseRate = 10 + Math.floor(Math.max(0, adminCapacity) / 45);
+  const baseRate = 12 + Math.floor(Math.max(0, adminCapacity) / 42);
   const stabMult =
     stability >= 60 ? 100 : 50 + Math.floor((Math.max(0, stability) * 50) / 60);
   const speedPct = mods.integrationSpeedPercent ?? 100;
-  return Math.max(5, Math.floor((baseRate * stabMult * speedPct) / 10_000));
+  return Math.max(7, Math.floor((baseRate * stabMult * speedPct) / 10_000));
 }
 
 export function computeExpansionPressure(
@@ -198,7 +198,7 @@ export function computeExpansionPressure(
 ): number {
   const safeCap = Math.max(200, adminCapacity);
   const excessTiles = Math.max(0, ownedTiles - safeCap);
-  const structuralStep = Math.max(110, Math.floor(safeCap / 4));
+  const structuralStep = Math.max(95, Math.floor(safeCap / 5));
   const structuralStrain = Math.min(
     CROWNFALL_CONFIG.overexpansionStructuralMax,
     Math.floor(excessTiles / structuralStep),
@@ -378,7 +378,7 @@ export function civilianGrowthPerSecond(
     return -Math.max(1, Math.floor((currentPop - cap) / 20));
   }
   const headroom = cap - currentPop;
-  const baseGrowth = Math.max(50, Math.floor(headroom / 90));
+  const baseGrowth = Math.max(65, Math.floor(headroom / 75));
   const taxMult = CROWNFALL_CONFIG.tax[taxRate].growthPercent;
   // Stability scales growth: 100 stability = 120%, 50 = 100%, 0 = 60%
   const stabMult = 60 + Math.floor((stability * 60) / 100);
@@ -399,8 +399,8 @@ export function civilianTaxGoldPerSecond(
   if (player.type() === PlayerType.Bot) {
     return 0n;
   }
-  // 22 gold/sec per 1,000 civilians at Normal tax & 100% stability/integration efficiency.
-  const baseGold = Math.floor((civilianPop * 22) / 1000);
+  // 23 gold/sec per 1,000 civilians at Normal tax & 100% stability/integration efficiency.
+  const baseGold = Math.floor((civilianPop * 23) / 1000);
   const taxMult = CROWNFALL_CONFIG.tax[taxRate].incomePercent;
   // Low stability hurts tax collection sharply (100% at >=60, 75% in unrest, 50% in crisis, 25% in rebellion).
   const stabEfficiency =
@@ -421,7 +421,7 @@ export function civilianTaxGoldPerSecond(
     ),
   );
   const integrationEff =
-    ownedTiles > 0 ? 100 - Math.floor((unintegrated * 45) / ownedTiles) : 100;
+    ownedTiles > 0 ? 100 - Math.floor((unintegrated * 30) / ownedTiles) : 100;
   const raw = Math.floor(
     ((baseGold *
       taxMult *

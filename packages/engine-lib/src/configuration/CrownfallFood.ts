@@ -20,13 +20,13 @@ export interface FoodBreakdown {
 }
 
 export const CROWNFALL_FOOD_CONFIG = {
-  startingFood: 1_500,
+  startingFood: 1_800,
   baseFoodCap: 6_000,
   granaryCapPerLevel: 8_000,
-  baseHomelandFoodPerSec: 5, // 300 / min baseline supports early homeland (~15k-18k pop), then requires Farms/Trade
+  baseHomelandFoodPerSec: 6, // 360 / min baseline supports early homeland (~18k-24k pop), then requires Farms/Trade
   arableLandExponent: 0.5,
   arableLandDivisor: 6, // Unimproved conquered land gives modest foraging, never replacing Farms
-  farmFoodPerSecPerLevel: 18, // +1,080 / min per Farm level
+  farmFoodPerSecPerLevel: 20, // +1,200 / min per Farm level
   bakeryFlatFoodPerSecPerLevel: 6, // +360 / min per Bakery level
   bakeryEfficiencyPercentPerLevel: 15, // +15% food efficiency per Bakery level
   bakeryEfficiencyMaxPercent: 75,
@@ -200,12 +200,15 @@ export function computeFoodStabilityDelta(
       return CROWNFALL_FOOD_CONFIG.acuteShortageStabilityPenalty + bakeryBonus;
     }
   }
-  if (
-    breakdown.status === "surplus" &&
-    breakdown.maxStorage > 0 &&
-    breakdown.reserves * 100 >= breakdown.maxStorage * 60
-  ) {
-    return CROWNFALL_FOOD_CONFIG.abundantSurplusStabilityBonus + bakeryBonus;
+  if (breakdown.status === "surplus") {
+    const abundant =
+      breakdown.maxStorage > 0 &&
+      breakdown.reserves * 100 >= breakdown.maxStorage * 60;
+    return (
+      (abundant
+        ? CROWNFALL_FOOD_CONFIG.abundantSurplusStabilityBonus + 1
+        : 3) + bakeryBonus
+    );
   }
   return bakeryBonus;
 }

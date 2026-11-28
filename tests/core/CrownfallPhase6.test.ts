@@ -234,8 +234,8 @@ describe("Crownfall Phase 6: Advanced Technologies & National Operations", () =>
 
     const rollA = rollMatchOperations("game-alpha:p1", DevelopmentPath.Military);
     const rollB = rollMatchOperations("game-bravo:p1", DevelopmentPath.Military);
-    expect(rollA.length).toBe(8);
-    expect(rollB.length).toBe(8);
+    expect(rollA.length).toBe(3);
+    expect(rollB.length).toBe(3);
     // Deterministic for same match seed
     expect(rollMatchOperations("game-alpha:p1", DevelopmentPath.Military)).toEqual(
       rollA,
